@@ -1,0 +1,224 @@
+import { Bot, GrammyError, HttpError } from 'grammy';
+import type { ApiClientOptions } from 'grammy';
+import { t } from '../shared/i18n/index.js';
+import { logger } from '../shared/logger/index.js';
+import { toError } from '../shared/errors/index.js';
+import { AppContext } from './context.js';
+import { errorHandler } from './middleware/error.js';
+import { hydrateUser } from './middleware/hydrate-user.js';
+import { createFlowMiddleware, type FlowDefinition } from './conversations/flow.js';
+import type { FlowStore } from './conversations/flow.store.js';
+import { createAddPersonFlow, startAddPerson } from './conversations/add-person.js';
+import { createEditPersonFlow } from './conversations/edit-person.js';
+import { createAddInterestFlow } from './conversations/add-interest.js';
+import { handleStart } from './commands/start.js';
+import { handleCancel } from './commands/cancel.js';
+import { mainMenuLabels, mainMenuKeyboard } from './keyboards/main.js';
+import { listKeyboard } from './keyboards/person.js';
+import { settingsKeyboard } from './keyboards/settings.js';
+import { parseCallbackData } from './callbacks/data.js';
+import { handleNavCallback, handleSettingsCallback, showPeopleList } from './callbacks/nav.callbacks.js';
+import { handlePersonCallback } from './callbacks/person.callbacks.js';
+import { handleFlowCallback, handleInterestDelete } from './callbacks/flow.callbacks.js';
+import { handleReminderToggle } from './callbacks/reminder.callbacks.js';
+import { upcomingListText } from './views/person.views.js';
+import { settingsText } from './views/settings.views.js';
+import { helpText } from './views/menu.views.js';
+import { ackCallback, editOrSend } from './helpers.js';
+import type { Services } from '../container.js';
+
+export interface CreateBotDeps {
+  token: string;
+  services: Services;
+  flowStore: FlowStore;
+  /** Passed to grammY; tests use it to answer Telegram calls without a network. */
+  client?: ApiClientOptions;
+}
+
+/**
+ * Telegram layer: it only orchestrates. All business logic lives in the
+ * services under `src/modules`, and all persistence in the repositories.
+ */
+export function createBot({ token, services, flowStore, client }: CreateBotDeps): Bot<AppContext> {
+  // `ContextConstructor` is required: grammY never creates `ctx.state` itself.
+  const bot = new Bot<AppContext>(token, { ContextConstructor: AppContext, client });
+
+  const flows: FlowDefinition[] = [
+    createAddPersonFlow(flowStore),
+    createEditPersonFlow(services, flowStore),
+    createAddInterestFlow(services, flowStore),
+  ];
+
+  bot.use(errorHandler());
+  bot.use(hydrateUser(services));
+  bot.use(createFlowMiddleware(flowStore, flows));
+
+  registerCommands(bot);
+  registerMenuButtons(bot, services, flowStore);
+  registerCallbackHandler(bot, services, flowStore);
+  registerFallbacks(bot);
+  registerCatch(bot);
+
+  return bot;
+}
+
+function registerCommands(bot: Bot<AppContext>): void {
+  bot.command('start', async (ctx) => {
+    await handleStart(ctx);
+  });
+
+  bot.command('help', async (ctx) => {
+    await ctx.reply(helpText(ctx.state.lang));
+  });
+}
+
+function registerMenuButtons(bot: Bot<AppContext>, services: Services, flowStore: FlowStore): void {
+  bot.hears(mainMenuLabels(), async (ctx) => {
+    const lang = ctx.state.lang;
+    // grammY sets `ctx.match` to the whole matched string for string triggers,
+    // and to a RegExp match array for regex triggers.
+    const pressed = typeof ctx.match === 'string' ? ctx.match : (ctx.match[0] ?? '');
+
+    if (pressed === t('menu.addPerson', lang)) {
+      await startAddPerson(ctx, flowStore);
+      return;
+    }
+
+    if (pressed === t('menu.people', lang)) {
+      await showPeopleList(ctx, services);
+      return;
+    }
+
+    if (pressed === t('menu.upcoming', lang)) {
+      const items = await services.birthdays.getUpcomingForUser(ctx.state.user.id);
+      await ctx.reply(upcomingListText(items, lang), {
+        parse_mode: 'HTML',
+        reply_markup: listKeyboard(items),
+      });
+      return;
+    }
+
+    if (pressed === t('menu.settings', lang)) {
+      const settings = await services.settings.get(ctx.state.user.id);
+      await ctx.reply(settingsText(settings, lang), {
+        parse_mode: 'HTML',
+        reply_markup: settingsKeyboard(settings, lang),
+      });
+      return;
+    }
+
+    if (pressed === t('menu.home', lang)) {
+      await ctx.reply(t('menu.title', lang), { reply_markup: mainMenuKeyboard(lang) });
+      return;
+    }
+
+    await ctx.reply(helpText(lang), { reply_markup: mainMenuKeyboard(lang) });
+  });
+
+  // `/cancel` must work even when no flow is active.
+  bot.command('cancel', async (ctx) => {
+    await flowStore.clear(ctx.state.user.id);
+    await handleCancel(ctx);
+  });
+}
+
+function registerCallbackHandler(bot: Bot<AppContext>, services: Services, flowStore: FlowStore): void {
+  bot.on('callback_query', async (ctx) => {
+    const data = parseCallbackData(ctx.callbackQuery.data);
+
+    if (!data) {
+      await ackCallback(ctx);
+      logger.warn(
+        { event: 'bot.callback.invalid', userId: ctx.state.user.id, raw: ctx.callbackQuery.data },
+        'rejected invalid callback data',
+      );
+      return;
+    }
+
+    const handled = await dispatchCallback(ctx, data, services, flowStore);
+
+    if (!handled) {
+      await ackCallback(ctx);
+      await editOrSend(ctx, t('errors.invalidInput', ctx.state.lang));
+    }
+  });
+}
+
+async function dispatchCallback(
+  ctx: AppContext,
+  data: NonNullable<ReturnType<typeof parseCallbackData>>,
+  services: Services,
+  flowStore: FlowStore,
+): Promise<boolean> {
+  if (data.kind.startsWith('nav:')) {
+    return handleNavCallback(ctx, data.kind.slice(4), { services });
+  }
+
+  if (data.kind.startsWith('person:') || data.kind.startsWith('person:edit')) {
+    return handlePersonCallback(ctx, data, {
+      services,
+      showPeopleList: (context) => showPeopleList(context, services),
+    });
+  }
+
+  if (data.kind === 'interest:del') {
+    return handleInterestDelete(ctx, data, services);
+  }
+
+  if (data.kind === 'reminder:toggle') {
+    return handleReminderToggle(ctx, data, services);
+  }
+
+  if (data.kind.startsWith('settings:')) {
+    return handleSettingsCallback(ctx, data, { services });
+  }
+
+  return handleFlowCallback(ctx, data, { services, store: flowStore });
+}
+
+/** Anything not understood ends up here, with the main menu restored. */
+function registerFallbacks(bot: Bot<AppContext>): void {
+  bot.on('message:text', async (ctx) => {
+    const lang = ctx.state.lang;
+    await ctx.reply(t('help.text', lang), { reply_markup: mainMenuKeyboard(lang) });
+  });
+}
+
+/** Last line of defence: a crash must never take the process down (§23). */
+function registerCatch(bot: Bot<AppContext>): void {
+  bot.catch((err) => {
+    const error = err.error;
+    const ctx = err.ctx;
+
+    if (error instanceof GrammyError || error instanceof HttpError) {
+      logger.error(
+        {
+          event: 'bot.telegram.error',
+          userId: ctx.state?.user?.id,
+          errorCode: telegramErrorCode(error),
+          description: telegramErrorDescription(error),
+        },
+        'telegram api error',
+      );
+      return;
+    }
+
+    logger.error(
+      { event: 'bot.update.crashed', userId: ctx.state?.user?.id, err: toError(error) },
+      'unhandled bot error',
+    );
+
+    if (ctx.callbackQuery) {
+      void ctx.answerCallbackQuery().catch(() => undefined);
+    }
+    void ctx.reply(t('errors.generic', ctx.state?.lang ?? 'fa')).catch(() => undefined);
+  });
+}
+
+function telegramErrorCode(error: GrammyError | HttpError): string | undefined {
+  return 'error_code' in error ? String(error.error_code) : undefined;
+}
+
+function telegramErrorDescription(error: GrammyError | HttpError): string | undefined {
+  return 'description' in error ? String(error.description) : undefined;
+}

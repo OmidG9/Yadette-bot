@@ -1,0 +1,129 @@
+// Yadet — database schema
+// Modular monolith: every query is scoped by userId to prevent cross-user access.
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id              String   @id @default(cuid())
+  /// Telegram user id, stored as string to avoid BigInt/JSON pitfalls.
+  telegramId      String   @unique
+  username        String?
+  firstName       String?
+  lastName        String?
+  timezone        String
+  language        String
+  reminderEnabled Boolean  @default(true)
+  lastSeenAt      DateTime?
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  people           Person[]
+  reminders        Reminder[]
+  notificationLogs NotificationLog[]
+  flowStates       UserFlowState[]
+
+  @@index([createdAt])
+}
+
+/// A person whose yearly birthday the user wants to remember.
+model Person {
+  id     String @id @default(cuid())
+  userId String
+  name   String
+  /// Birthday recurrence rule in the Jalali (Persian) calendar.
+  /// Yearly occurrences are derived from month/day — never from a single date.
+  birthMonth Int
+  birthDay   Int
+  /// Original birth year in the Jalali calendar, only when the user provided it.
+  birthYear  Int?
+  notes      String?
+  deletedAt  DateTime?
+  createdAt  DateTime  @default(now())
+  updatedAt  DateTime  @updatedAt
+
+  user             User               @relation(fields: [userId], references: [id], onDelete: Cascade)
+  interests        Interest[]
+  reminders        Reminder[]
+  notificationLogs NotificationLog[]
+
+  @@index([userId, deletedAt])
+  @@index([userId, name])
+  @@index([userId, birthMonth, birthDay])
+}
+
+/// Simple interest/tag stored for a person (e.g. "گیم", "قهوه").
+/// Not an AI recommendation system — plain user-provided information.
+model Interest {
+  id        String   @id @default(cuid())
+  personId  String
+  title     String
+  createdAt DateTime @default(now())
+
+  person Person @relation(fields: [personId], references: [id], onDelete: Cascade)
+
+  @@unique([personId, title])
+  @@index([personId])
+}
+
+/// A per-person reminder offset. Multiple reminders per person are supported.
+model Reminder {
+  id         String   @id @default(cuid())
+  userId     String
+  personId   String
+  /// Days before the birthday. 0 = on the birthday itself.
+  daysBefore Int
+  enabled    Boolean  @default(true)
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+  person Person @relation(fields: [personId], references: [id], onDelete: Cascade)
+
+  @@unique([personId, daysBefore])
+  @@index([userId, enabled])
+  @@index([personId, enabled])
+}
+
+/// Lightweight send-log that guarantees a reminder is never delivered twice.
+/// The unique constraint is the race-condition guard for concurrent scheduler runs.
+model NotificationLog {
+  id            String   @id @default(cuid())
+  userId        String
+  personId      String
+  /// Jalali year of the birthday occurrence this notification belongs to.
+  birthdayYear  Int
+  daysBefore    Int
+  sentAt        DateTime @default(now())
+
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+  person Person @relation(fields: [personId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, personId, birthdayYear, daysBefore])
+  @@index([userId, sentAt])
+  @@index([personId, birthdayYear])
+}
+
+/// Conversation state for multi-step Telegram flows.
+/// Persisted in PostgreSQL (not process memory) so a restart does not trap the user.
+/// The store interface is intentionally narrow so it can be swapped for Redis later.
+model UserFlowState {
+  userId    String   @id
+  flow      String
+  step      String
+  data      Json     @default("{}")
+  /// Telegram message id of the last prompt, so prompts can be edited in place.
+  messageId Int?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([updatedAt])
+}

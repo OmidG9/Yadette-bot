@@ -22,9 +22,10 @@ async function main(): Promise<void> {
   await bot.init();
   logger.info({ event: 'bot.initialized', username: bot.botInfo.username }, 'telegram bot ready');
 
-  // Visible shortcut list in the Telegram UI: /start, /help, /cancel.
+  // Visible shortcut list in the Telegram UI: /start, /about, /help, /cancel.
   await bot.api.setMyCommands([
     { command: 'start', description: t('commands.start') },
+    { command: 'about', description: t('commands.about') },
     { command: 'help', description: t('commands.help') },
     { command: 'cancel', description: t('commands.cancel') },
   ]);

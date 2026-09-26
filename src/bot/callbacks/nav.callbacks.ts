@@ -1,10 +1,10 @@
 import { t } from '../../shared/i18n/index.js';
 import type { AppContext } from '../context.js';
-import { ackCallback, editOrSend } from '../helpers.js';
+import { ackCallback, editOrSend, sendText } from '../helpers.js';
 import { listKeyboard } from '../keyboards/person.js';
 import { settingsKeyboard, timezoneKeyboard } from '../keyboards/settings.js';
 import { settingsText, timezoneListText } from '../views/settings.views.js';
-import { helpText } from '../views/menu.views.js';
+import { helpText, aboutText } from '../views/menu.views.js';
 import { upcomingListText } from '../views/person.views.js';
 import { ValidationError } from '../../shared/errors/index.js';
 import { startAddPerson } from '../conversations/add-person.js';
@@ -61,6 +61,13 @@ export async function handleNavCallback(
       return true;
     }
 
+    // The long read: what the bot is, how it works, and what it stores.
+    case 'about': {
+      await ackCallback(ctx);
+      await editOrSend(ctx, aboutText(lang));
+      return true;
+    }
+
     default:
       return false;
   }
@@ -108,7 +115,7 @@ export async function handleSettingsCallback(
 
     case 'settings:language': {
       await ackCallback(ctx);
-      await ctx.reply(t('settings.languageOnlyFa', lang));
+      await sendText(ctx, t('settings.languageOnlyFa', lang));
       return true;
     }
 

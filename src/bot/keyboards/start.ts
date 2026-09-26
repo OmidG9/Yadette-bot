@@ -5,19 +5,29 @@ import { t, type Language } from '../../shared/i18n/index.js';
 export const START_ADD_PAYLOAD = 'add';
 
 /**
- * Welcome screen of the first run: a single call to action that goes straight
- * into the add-person flow through a `?start=add` deep link, so it works even
- * when the button is tapped from a group chat.
+ * `/start` screen: a complete message with one tappable button per section, so
+ * a brand new user can see everything the bot does and jump straight into it.
+ *
+ * The add button goes through a `?start=add` deep link, which works even when
+ * the button is tapped from a group chat; without a known bot username it falls
+ * back to an internal callback.
  */
 export function welcomeKeyboard(username: string | undefined, lang: Language = 'fa'): InlineKeyboard {
   const keyboard = new InlineKeyboard();
   const cta = t('start.cta', lang);
 
   if (username) {
-    return keyboard.url(cta, `https://t.me/${username}?start=${START_ADD_PAYLOAD}`);
+    keyboard.url(cta, `https://t.me/${username}?start=${START_ADD_PAYLOAD}`);
+  } else {
+    // Without a known username the deep link cannot be built.
+    keyboard.text(cta, 'nav:add');
   }
 
-  // Without a known username the deep link cannot be built; the reply keyboard
-  // is still attached by the caller.
-  return keyboard.text(cta, 'nav:add');
+  return keyboard
+    .row()
+    .text(t('menu.upcoming', lang), 'nav:upcoming')
+    .text(t('menu.settings', lang), 'nav:settings')
+    .row()
+    .text(t('menu.help', lang), 'nav:help')
+    .text(t('menu.about', lang), 'nav:about');
 }

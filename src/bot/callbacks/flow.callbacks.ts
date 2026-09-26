@@ -1,6 +1,6 @@
-import { t } from '../../shared/i18n/index.js';
+﻿import { t } from '../../shared/i18n/index.js';
 import type { AppContext } from '../context.js';
-import { ackCallback, editOrSend } from '../helpers.js';
+import { ackCallback, editOrSend, sendText } from '../helpers.js';
 import { interestsKeyboard } from '../keyboards/reminder.js';
 import { interestsText } from '../views/person.views.js';
 import { ValidationError } from '../../shared/errors/index.js';
@@ -41,7 +41,7 @@ export async function handleFlowCallback(
     const state = await store.get(userId);
     if (!state || state.flow !== ADD_PERSON_FLOW) {
       await ackCallback(ctx);
-      await ctx.reply(t('flow.notActive', lang));
+      await sendText(ctx, t('flow.notActive', lang));
       return true;
     }
 
@@ -63,7 +63,7 @@ export async function handleFlowCallback(
     const state = await store.get(userId);
     if (!state || state.flow !== ADD_PERSON_FLOW) {
       await ackCallback(ctx);
-      await ctx.reply(t('flow.notActive', lang));
+      await sendText(ctx, t('flow.notActive', lang));
       return true;
     }
     await completeAddPerson(ctx, services, store, state);

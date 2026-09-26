@@ -21,8 +21,8 @@ import { handlePersonCallback } from './callbacks/person.callbacks.js';
 import { handleFlowCallback, handleInterestDelete } from './callbacks/flow.callbacks.js';
 import { handleReminderToggle } from './callbacks/reminder.callbacks.js';
 import { settingsText } from './views/settings.views.js';
-import { helpText } from './views/menu.views.js';
-import { ackCallback, editOrSend } from './helpers.js';
+import { helpText, aboutText } from './views/menu.views.js';
+import { ackCallback, editOrSend, sendText } from './helpers.js';
 import type { Services } from '../container.js';
 
 export interface CreateBotDeps {
@@ -66,7 +66,11 @@ function registerCommands(bot: Bot<AppContext>, services: Services, flowStore: F
   });
 
   bot.command('help', async (ctx) => {
-    await ctx.reply(helpText(ctx.state.lang), { parse_mode: 'HTML' });
+    await sendText(ctx, helpText(ctx.state.lang), mainMenuKeyboard(ctx.state.lang));
+  });
+
+  bot.command('about', async (ctx) => {
+    await sendText(ctx, aboutText(ctx.state.lang), mainMenuKeyboard(ctx.state.lang));
   });
 }
 
@@ -89,19 +93,16 @@ function registerMenuButtons(bot: Bot<AppContext>, services: Services, flowStore
 
     if (pressed === t('menu.settings', lang)) {
       const settings = await services.settings.get(ctx.state.user.id);
-      await ctx.reply(settingsText(settings, lang), {
-        parse_mode: 'HTML',
-        reply_markup: settingsKeyboard(settings, lang),
-      });
+      await sendText(ctx, settingsText(settings, lang), settingsKeyboard(settings, lang));
       return;
     }
 
     if (pressed === t('menu.home', lang)) {
-      await ctx.reply(t('menu.title', lang), { reply_markup: mainMenuKeyboard(lang) });
+      await sendText(ctx, t('menu.title', lang), mainMenuKeyboard(lang));
       return;
     }
 
-    await ctx.reply(helpText(lang), { parse_mode: 'HTML', reply_markup: mainMenuKeyboard(lang) });
+    await sendText(ctx, helpText(lang), mainMenuKeyboard(lang));
   });
 
   // `/cancel` must work even when no flow is active.
@@ -168,8 +169,7 @@ async function dispatchCallback(
 /** Anything not understood ends up here, with the main menu restored. */
 function registerFallbacks(bot: Bot<AppContext>): void {
   bot.on('message:text', async (ctx) => {
-    const lang = ctx.state.lang;
-    await ctx.reply(t('help.text', lang), { reply_markup: mainMenuKeyboard(lang) });
+    await sendText(ctx, helpText(ctx.state.lang), mainMenuKeyboard(ctx.state.lang));
   });
 }
 
@@ -200,7 +200,7 @@ function registerCatch(bot: Bot<AppContext>): void {
     if (ctx.callbackQuery) {
       void ctx.answerCallbackQuery().catch(() => undefined);
     }
-    void ctx.reply(t('errors.generic', ctx.state?.lang ?? 'fa')).catch(() => undefined);
+    void sendText(ctx, t('errors.generic', ctx.state?.lang ?? 'fa')).catch(() => undefined);
   });
 }
 

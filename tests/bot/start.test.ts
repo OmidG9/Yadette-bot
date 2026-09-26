@@ -1,7 +1,8 @@
-import { describe, expect, it } from 'vitest';
+﻿import { describe, expect, it } from 'vitest';
 import { welcomeText, helpText } from '../../src/bot/views/menu.views.js';
 import { welcomeKeyboard, START_ADD_PAYLOAD } from '../../src/bot/keyboards/start.js';
 import { mainMenuLabels, mainMenuKeyboard } from '../../src/bot/keyboards/main.js';
+import { parseCallbackData } from '../../src/bot/callbacks/data.js';
 import type { UserRecord } from '../../src/modules/users/user.types.js';
 
 function user(overrides: Partial<UserRecord> = {}): UserRecord {
@@ -23,31 +24,33 @@ function user(overrides: Partial<UserRecord> = {}): UserRecord {
 
 describe('first-run welcome', () => {
   it('explains the product and the privacy promise to a brand new user', () => {
-    const text = welcomeText(user(), true, false, 'fa');
+    const text = welcomeText(user(), true, 0, 'fa');
     expect(text).toContain('من یادم');
     expect(text).toContain('🔒');
     expect(text).not.toContain('{{');
   });
 
-  it('keeps a returning user with people on a short greeting', () => {
-    const text = welcomeText(user(), false, true, 'fa');
+  it('gives a returning user their status and points at the buttons', () => {
+    const text = welcomeText(user(), false, 3, 'fa');
     expect(text).toContain('امیر');
+    expect(text).toContain('۳ نفر');
+    expect(text).toContain('دکمه‌های زیر');
     expect(text).not.toContain('من یادم');
   });
 
-  it('nudges a returning user who has no people yet', () => {
-    const text = welcomeText(user(), false, false, 'fa');
+  it('tells a returning user with an empty list how to start', () => {
+    const text = welcomeText(user(), false, 0, 'fa');
     expect(text).toContain('امیر');
     expect(text).toContain('هنوز کسی اضافه نکردی');
   });
 
   it('falls back to a friendly name when Telegram gives no name', () => {
-    const text = welcomeText(user({ firstName: null, username: null }), false, true, 'fa');
+    const text = welcomeText(user({ firstName: null, username: null }), false, 3, 'fa');
     expect(text).toContain('دوست عزیز');
   });
 
   it('escapes a name that contains HTML', () => {
-    const text = welcomeText(user({ firstName: '<b>hack</b>' }), false, true, 'fa');
+    const text = welcomeText(user({ firstName: '<b>hack</b>' }), false, 3, 'fa');
     expect(text).toContain('&lt;b&gt;hack&lt;/b&gt;');
   });
 });
@@ -61,6 +64,33 @@ describe('welcome call to action', () => {
   it('falls back to an internal callback without a bot username', () => {
     const button = welcomeKeyboard(undefined).inline_keyboard[0]?.[0];
     expect(button).toMatchObject({ callback_data: 'nav:add' });
+  });
+
+  it('offers a tappable button for every section', () => {
+    const rows = welcomeKeyboard('Yadett_bot').inline_keyboard;
+    expect(rows).toHaveLength(3);
+    expect(rows.flat().map((button) => button.text)).toEqual([
+      '➕ اضافه کردن اولین نفر',
+      '🎂 تولدها',
+      '⚙️ تنظیمات',
+      'ℹ️ راهنما',
+      '📖 درباره یادت',
+    ]);
+  });
+
+  /**
+   * Regression: `nav:add` was missing from the known callback targets, so the
+   * no-username fallback button was silently ignored by the dispatcher.
+   */
+  it('only emits callbacks the dispatcher understands', () => {
+    for (const username of ['Yadett_bot', undefined]) {
+      for (const row of welcomeKeyboard(username).inline_keyboard) {
+        for (const button of row) {
+          if (!('callback_data' in button)) continue;
+          expect(parseCallbackData(button.callback_data), button.callback_data).not.toBeNull();
+        }
+      }
+    }
   });
 });
 

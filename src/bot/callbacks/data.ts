@@ -20,7 +20,7 @@ const RawCallbackSchema = z
 
 export type CallbackData = z.infer<typeof RawCallbackSchema>;
 
-const NAV_TARGETS = ['menu', 'upcoming', 'people', 'settings', 'help'] as const;
+const NAV_TARGETS = ['menu', 'upcoming', 'people', 'settings', 'help', 'add', 'about'] as const;
 
 const PERSON_ACTIONS = [
   'view',
@@ -121,8 +121,9 @@ export const reminderPendingCallback = (days: number): string => `reminder:pendi
 
 export const timezoneCallback = (timezone: string): string => `settings:tz:set:${timezone}`;
 
-export const navCallback = (target: 'menu' | 'upcoming' | 'people' | 'settings' | 'help'): string =>
-  `nav:${target}`;
+export const navCallback = (
+  target: 'menu' | 'upcoming' | 'people' | 'settings' | 'help' | 'add' | 'about',
+): string => `nav:${target}`;
 
 export const saveAddPersonCallback = (): string => 'flow:person:save';
 

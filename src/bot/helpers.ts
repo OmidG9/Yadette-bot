@@ -5,7 +5,7 @@ import { t } from '../shared/i18n/index.js';
 
 export type MessageExtra = {
   parse_mode: 'HTML';
-  reply_markup?: InlineKeyboard | Keyboard;
+  reply_markup?: InlineKeyboard;
 };
 
 /**
@@ -75,7 +75,7 @@ export async function editMessageById(
   chatId: number,
   messageId: number,
   text: string,
-  keyboard?: InlineKeyboard | Keyboard,
+  keyboard?: InlineKeyboard,
 ): Promise<boolean> {
   try {
     await ctx.api.editMessageText(chatId, messageId, text, {

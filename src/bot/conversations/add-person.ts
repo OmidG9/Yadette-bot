@@ -5,7 +5,7 @@ import { parseBirthDate } from '../../shared/utils/date.js';
 import { ValidationError } from '../../shared/errors/index.js';
 import { DEFAULT_REMINDER_DAYS } from '../../shared/constants/index.js';
 import type { AppContext } from '../context.js';
-import { editOrSend } from '../helpers.js';
+import { editOrSend, sendText, showMainMenu } from '../helpers.js';
 import { cancelKeyboard, pendingReminderKeyboard } from '../keyboards/reminder.js';
 import { personDetailsKeyboard } from '../keyboards/person.js';
 import {
@@ -114,9 +114,17 @@ export async function startAddPerson(ctx: AppContext, store: FlowStore): Promise
     data: { ...initialData() },
     messageId: null,
   });
-  await ctx.reply(`${t('addPerson.askName', lang)}\n\n${t('hint.cancel', lang)}`, {
-    reply_markup: cancelKeyboard('nav:menu', lang),
-  });
+  await sendText(
+    ctx,
+    `${t('addPerson.askName', lang)}\n\n${t('hint.cancel', lang)}`,
+    cancelKeyboard('nav:menu', lang),
+  );
+
+  // Arriving straight from the `?start=add` deep link means no welcome message
+  // was sent, so the reply keyboard still has to be installed once.
+  if (ctx.state.isNewUser) {
+    await showMainMenu(ctx);
+  }
 }
 
 /**
@@ -131,7 +139,7 @@ export function createAddPersonFlow(store: FlowStore): FlowDefinition {
     menuSteps: ['name', 'birthday', 'interests', 'notes', 'reminders'],
     onCancel: async (ctx) => {
       await store.clear(ctx.state.user.id);
-      await ctx.reply(t('flow.cancelled', ctx.state.lang));
+      await sendText(ctx, t('flow.cancelled', ctx.state.lang));
     },
 
     steps: {

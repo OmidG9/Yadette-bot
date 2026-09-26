@@ -1,4 +1,5 @@
 import { t, type Language } from '../../shared/i18n/index.js';
+import { toPersianDigits } from '../../shared/utils/date.js';
 import { escapeHtml } from '../../shared/utils/text.js';
 import type { UserRecord } from '../../modules/users/user.types.js';
 
@@ -7,20 +8,28 @@ function displayName(user: UserRecord): string {
 }
 
 /**
- * First contact gets the full explanation plus a call to action; a returning
- * user with people already in the list only gets a short greeting.
+ * First contact gets the full explanation; a returning user gets a complete
+ * status line. Both are followed by one tappable button per section, so the
+ * whole bot is reachable from the very first message.
  */
 export function welcomeText(
   user: UserRecord,
   created: boolean,
-  hasPeople: boolean,
+  peopleCount: number,
   lang: Language,
 ): string {
   if (created) return t('start.newUser', lang);
-  if (!hasPeople) return t('start.empty', lang, { name: displayName(user) });
-  return t('start.returning', lang, { name: displayName(user) });
+  return t(peopleCount > 0 ? 'start.returning' : 'start.empty', lang, {
+    name: displayName(user),
+    count: toPersianDigits(peopleCount),
+  });
 }
 
 export function helpText(lang: Language): string {
   return t('help.text', lang, { hint: t('hint.keyboard', lang) });
+}
+
+/** The full story behind the bot, readable at any time via /about. */
+export function aboutText(lang: Language): string {
+  return t('about.text', lang);
 }

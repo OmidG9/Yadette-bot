@@ -1,5 +1,5 @@
 import type { AppContext } from '../context.js';
-import { showMainMenu } from '../helpers.js';
+import { showMainMenu, sendText } from '../helpers.js';
 import { welcomeText } from '../views/menu.views.js';
 import { welcomeKeyboard, START_ADD_PAYLOAD } from '../keyboards/start.js';
 import { startAddPerson } from '../conversations/add-person.js';
@@ -15,11 +15,11 @@ export interface StartDeps {
 /**
  * `/start` (§10).
  *
- * Three cases:
- *  - `?start=add` deep link from the welcome button → straight into the flow;
- *  - first contact → explanation plus the call-to-action button;
- *  - anything else → short greeting, and the same call to action while the
- *    user still has nobody in the list.
+ * One complete message, whatever the user already has: a brand new user gets the
+ * explanation, a returning user gets their status. Either way the message
+ * carries one tappable button per section, so nothing is hidden behind a guess.
+ *
+ *  - `?start=add` deep link from the welcome button → straight into the flow.
  */
 export async function handleStart(ctx: AppContext, deps: StartDeps): Promise<void> {
   const lang = ctx.state.lang;
@@ -30,19 +30,16 @@ export async function handleStart(ctx: AppContext, deps: StartDeps): Promise<voi
     return;
   }
 
-  const hasPeople = (await deps.services.persons.countForUser(user.id)) > 0;
-  const text = welcomeText(user, ctx.state.isNewUser, hasPeople, lang);
-  const keyboard = hasPeople ? undefined : welcomeKeyboard(ctx.me.username, lang);
+  const peopleCount = await deps.services.persons.countForUser(user.id);
+  const text = welcomeText(user, ctx.state.isNewUser, peopleCount, lang);
+  const username = ctx.me.username;
+  const body = username ? text : `${text}\n\n${t('start.ctaFallback', lang)}`;
 
-  if (keyboard) {
-    const username = ctx.me.username;
-    await ctx.reply(username ? text : `${text}\n\n${t('start.ctaFallback', lang)}`, {
-      parse_mode: 'HTML',
-      reply_markup: keyboard,
-    });
+  await sendText(ctx, body, welcomeKeyboard(username, lang));
+
+  // The reply keyboard is sticky in the client, so it is only installed on the
+  // very first contact; later `/start` presses keep the chat to a single message.
+  if (ctx.state.isNewUser) {
     await showMainMenu(ctx);
-    return;
   }
-
-  await showMainMenu(ctx, text);
 }

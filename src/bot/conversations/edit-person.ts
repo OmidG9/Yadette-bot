@@ -4,7 +4,7 @@ import { cleanName, cleanNotes, parseInterests } from '../../shared/utils/text.j
 import { formatJalali, parseBirthDate } from '../../shared/utils/date.js';
 import { ValidationError } from '../../shared/errors/index.js';
 import type { AppContext } from '../context.js';
-import { editOrSend } from '../helpers.js';
+import { editOrSend, sendText } from '../helpers.js';
 import { cancelKeyboard } from '../keyboards/reminder.js';
 import { personDetailsKeyboard, personEditKeyboard } from '../keyboards/person.js';
 import { personDetailsText, personEditedText } from '../views/person.views.js';
@@ -120,7 +120,7 @@ export function createEditPersonFlow(services: Services, store: FlowStore): Flow
     steps: {
       // The field chooser is rendered with inline buttons; nothing to read here.
       choose: async (ctx) => {
-        await ctx.reply(t('flow.busy', ctx.state.lang));
+        await sendText(ctx, t('flow.busy', ctx.state.lang));
         return {};
       },
 

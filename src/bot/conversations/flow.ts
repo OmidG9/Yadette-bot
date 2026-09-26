@@ -1,6 +1,7 @@
-import type { MiddlewareFn } from 'grammy';
+﻿import type { MiddlewareFn } from 'grammy';
 import type { AppContext } from '../context.js';
 import { t } from '../../shared/i18n/index.js';
+import { sendText } from '../helpers.js';
 import { mainMenuLabels } from '../keyboards/main.js';
 import { logger } from '../../shared/logger/index.js';
 import { toError } from '../../shared/errors/index.js';
@@ -85,13 +86,13 @@ export function createFlowMiddleware(
       if (flow.onCancel) {
         await flow.onCancel(ctx, state);
       } else {
-        await ctx.reply(t('flow.cancelled', lang));
+        await sendText(ctx, t('flow.cancelled', lang));
       }
       return;
     }
 
     if (flow.menuSteps?.includes(state.step) && mainMenuLabels().includes(text.trim())) {
-      await ctx.reply(t('flow.busy', lang));
+      await sendText(ctx, t('flow.busy', lang));
       return;
     }
 
@@ -107,7 +108,7 @@ export function createFlowMiddleware(
         'flow step not found',
       );
       await store.clear(ctx.state.user.id);
-      await ctx.reply(t('flow.notActive', lang));
+      await sendText(ctx, t('flow.notActive', lang));
       return;
     }
 
@@ -140,7 +141,7 @@ export function createFlowMiddleware(
         },
         'flow step failed',
       );
-      await ctx.reply(t('errors.generic', lang));
+      await sendText(ctx, t('errors.generic', lang));
     }
   };
 }

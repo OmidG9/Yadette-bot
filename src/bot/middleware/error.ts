@@ -2,7 +2,7 @@ import type { MiddlewareFn } from 'grammy';
 import { t, type Language } from '../../shared/i18n/index.js';
 import { AppError, toError } from '../../shared/errors/index.js';
 import { logger } from '../../shared/logger/index.js';
-import { ackCallback } from '../helpers.js';
+import { ackCallback, editMessageById, sendText } from '../helpers.js';
 import type { AppContext } from '../context.js';
 
 /**
@@ -53,10 +53,13 @@ export function errorHandler(): MiddlewareFn<AppContext> {
       try {
         const lang = ctx.state?.lang ?? 'fa';
         const text = error instanceof AppError ? userFacingText(error, lang) : t('errors.generic', lang);
-        if (ctx.callbackQuery?.message) {
-          await ctx.editMessageText(text).catch(() => undefined);
+        const chatId = ctx.chat?.id;
+        const messageId = ctx.callbackQuery?.message?.message_id ?? ctx.message?.message_id;
+
+        if (chatId !== undefined && messageId !== undefined) {
+          await editMessageById(ctx, chatId, messageId, text);
         } else {
-          await ctx.reply(text).catch(() => undefined);
+          await sendText(ctx, text);
         }
       } catch {
         // The bot must survive even if Telegram is unreachable.

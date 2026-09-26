@@ -239,7 +239,7 @@ export function isValidCivilDate(date: CivilDate): boolean {
 // ---------------------------------------------------------------------------
 
 /**
- * Yadet stores birthdays in the Jalali (Persian) calendar: what the user types
+ * Yadette stores birthdays in the Jalali (Persian) calendar: what the user types
  * is exactly what the user sees. ISO input is converted to Jalali on the way in.
  */
 export interface ParsedBirthday {

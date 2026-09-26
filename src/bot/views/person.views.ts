@@ -4,7 +4,6 @@ import { formatDaysUntil, formatJalali, toPersianDigits } from '../../shared/uti
 import type { UpcomingBirthday } from '../../modules/birthdays/birthday.types.js';
 import type { PersonWithReminders } from '../../modules/people/person.types.js';
 import { reminderLabel } from '../../modules/reminders/reminder.service.js';
-import { MAIN_MENU_HINT } from './hint.js';
 
 /** `<b>` is the only formatting used, so user text is escaped, not stripped. */
 function safe(value: string): string {
@@ -38,21 +37,6 @@ export function upcomingListText(items: UpcomingBirthday[], lang: Language): str
   return [t('upcoming.title', lang), '', ...lines].join('\n');
 }
 
-export function peopleListText(items: UpcomingBirthday[], lang: Language): string {
-  if (items.length === 0) return t('people.empty', lang);
-
-  const lines = items.map((item, index) =>
-    t('people.item', lang, {
-      index: toPersianDigits(index + 1),
-      name: safe(truncate(item.person.name, 40)),
-      date: formatJalali(item.rule.month, item.rule.day),
-      countdown: formatDaysUntil(item.daysUntil),
-    }),
-  );
-
-  return [t('people.title', lang), '', ...lines].join('\n');
-}
-
 /** §16 — person details. Notes stay private to the owner. */
 export function personDetailsText(item: UpcomingBirthday, lang: Language): string {
   const person = item.person;
@@ -78,7 +62,7 @@ export function personDetailsText(item: UpcomingBirthday, lang: Language): strin
     t('person.reminders', lang, {
       value: enabled.length
         ? enabled.map((reminder) => reminderLabel(reminder.daysBefore, lang)).join('، ')
-        : t('common.unknown', lang),
+        : t('common.none', lang),
     }),
   );
 
@@ -114,12 +98,20 @@ export function addPersonConfirmationText(
     parts.push('', `${t('person.notes', lang)}`, safe(truncate(data.notes, 300)));
   }
 
-  parts.push('', MAIN_MENU_HINT);
+  parts.push('', t('hint.keyboard', lang));
   return parts.join('\n');
 }
 
-export function addPersonSavedText(name: string, lang: Language): string {
-  return t('addPerson.saved', lang, { name: safe(name) });
+export function addPersonSavedText(
+  name: string,
+  reminderCount: number,
+  lang: Language,
+): string {
+  return [
+    t('addPerson.saved', lang, { name: safe(name) }),
+    '',
+    t('addPerson.savedFooter', lang, { count: toPersianDigits(Math.max(reminderCount, 0)) }),
+  ].join('\n');
 }
 
 export function personEditedText(lang: Language): string {

@@ -1,11 +1,11 @@
-import type { InlineKeyboard } from 'grammy';
+import type { InlineKeyboard, Keyboard } from 'grammy';
 import { mainMenuKeyboard } from './keyboards/main.js';
 import type { AppContext } from './context.js';
 import { t } from '../shared/i18n/index.js';
 
-export type KeyboardExtra = {
+export type MessageExtra = {
   parse_mode: 'HTML';
-  reply_markup?: InlineKeyboard;
+  reply_markup?: InlineKeyboard | Keyboard;
 };
 
 /**
@@ -13,7 +13,25 @@ export type KeyboardExtra = {
  *
  * UX rule from the spec: prefer editing the existing message instead of sending
  * a new one, so the chat stays compact.
+ *
+ * Every user-facing message goes through `sendText` or `editOrSend`. Both always
+ * set `parse_mode: 'HTML'`, so the `<b>` in the copy renders as bold instead of
+ * leaking as raw tags — there is deliberately no way to send a message without
+ * it.
  */
+
+/** The only way user-facing text reaches Telegram. */
+export async function sendText(
+  ctx: AppContext,
+  text: string,
+  keyboard?: InlineKeyboard | Keyboard,
+): Promise<number> {
+  const sent = await ctx.reply(text, {
+    parse_mode: 'HTML',
+    ...(keyboard ? { reply_markup: keyboard } : {}),
+  });
+  return sent.message_id;
+}
 
 /** Sends or edits a message, preferring an in-place edit. */
 export async function editOrSend(
@@ -21,7 +39,7 @@ export async function editOrSend(
   text: string,
   keyboard?: InlineKeyboard,
 ): Promise<number | undefined> {
-  const extra: KeyboardExtra = {
+  const extra: MessageExtra = {
     parse_mode: 'HTML',
     ...(keyboard ? { reply_markup: keyboard } : {}),
   };
@@ -41,7 +59,7 @@ export async function editOrSend(
 export async function editCurrentMessage(
   ctx: AppContext,
   text: string,
-  extra: KeyboardExtra,
+  extra: MessageExtra,
 ): Promise<number | undefined> {
   const chatId = ctx.chat?.id;
   const messageId = ctx.callbackQuery?.message?.message_id ?? ctx.message?.message_id;
@@ -57,7 +75,7 @@ export async function editMessageById(
   chatId: number,
   messageId: number,
   text: string,
-  keyboard?: InlineKeyboard,
+  keyboard?: InlineKeyboard | Keyboard,
 ): Promise<boolean> {
   try {
     await ctx.api.editMessageText(chatId, messageId, text, {
@@ -73,9 +91,11 @@ export async function editMessageById(
 
 /** Sends the main menu with the reply keyboard attached. */
 export async function showMainMenu(ctx: AppContext, text?: string): Promise<void> {
-  await ctx.reply(text ?? t('menu.title', ctx.state.lang), {
-    reply_markup: mainMenuKeyboard(ctx.state.lang),
-  });
+  await sendText(
+    ctx,
+    text ?? t('menu.title', ctx.state.lang),
+    mainMenuKeyboard(ctx.state.lang),
+  );
 }
 
 /** Silently acknowledges a callback query (never let the spinner hang). */

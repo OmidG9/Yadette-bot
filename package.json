@@ -1,10 +1,10 @@
 {
-  "name": "yadet-bot",
+  "name": "yadette-bot",
   "version": "0.1.0",
   "private": true,
   "type": "module",
   "packageManager": "pnpm@12.6.0",
-  "description": "Yadet (یادت) — Telegram Birthday Assistant",
+  "description": "Yadette (یادته) — Telegram Birthday Assistant",
   "engines": {
     "node": ">=20"
   },

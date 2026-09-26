@@ -1,4 +1,4 @@
-// Yadet — database schema
+// Yadette — database schema
 // Modular monolith: every query is scoped by userId to prevent cross-user access.
 
 generator client {

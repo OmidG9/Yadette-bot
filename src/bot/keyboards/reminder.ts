@@ -48,8 +48,8 @@ export function pendingReminderKeyboard(
 
   return keyboard
     .row()
-    .text(t('buttons.confirm', lang), CONFIRM_DATA)
-    .text(t('buttons.cancel', lang), CANCEL_DATA);
+    .text(t('common.confirm', lang), CONFIRM_DATA)
+    .text(t('common.cancel', lang), CANCEL_DATA);
 }
 
 /** Interests list with per-item delete buttons. */
@@ -80,5 +80,5 @@ export function confirmKeyboard(yesData: string, noData: string, lang: Language 
 }
 
 export function cancelKeyboard(cancelData = CANCEL_DATA, lang: Language = 'fa'): InlineKeyboard {
-  return new InlineKeyboard().text(t('buttons.cancel', lang), cancelData);
+  return new InlineKeyboard().text(t('common.cancel', lang), cancelData);
 }

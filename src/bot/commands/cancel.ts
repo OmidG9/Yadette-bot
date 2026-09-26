@@ -6,7 +6,7 @@ import { mainMenuKeyboard } from '../keyboards/main.js';
 /** `/cancel` — works even when no flow is active (§35). */
 export async function handleCancel(ctx: AppContext): Promise<void> {
   const lang = ctx.state.lang;
-  await ctx.reply(t('addPerson.cancelled', lang));
+  await ctx.reply(t('flow.cancelled', lang));
   await showMainMenu(ctx);
 }
 

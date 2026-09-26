@@ -4,7 +4,7 @@ import { AppContext } from '../../src/bot/context.js';
 
 // Only `id`, `is_bot` and the names are read by the bot, so the rest of
 // `UserFromGetMe` is irrelevant here.
-const me = { id: 1, is_bot: true, first_name: 'Yadet', username: 'yadett_bot' } as UserFromGetMe;
+const me = { id: 1, is_bot: true, first_name: 'Yadette', username: 'yadette_bot' } as UserFromGetMe;
 
 function context(): AppContext {
   const update = {

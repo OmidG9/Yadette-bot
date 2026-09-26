@@ -114,7 +114,7 @@ export function createEditPersonFlow(services: Services, store: FlowStore): Flow
     onCancel: async (ctx, state) => {
       await store.clear(ctx.state.user.id);
       const { personId } = readEditData(state);
-      await showDetails(ctx, services, personId, t('addPerson.cancelled', ctx.state.lang));
+      await showDetails(ctx, services, personId, t('flow.cancelled', ctx.state.lang));
     },
 
     steps: {

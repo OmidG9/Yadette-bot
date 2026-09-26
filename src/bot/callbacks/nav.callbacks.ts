@@ -5,12 +5,15 @@ import { listKeyboard } from '../keyboards/person.js';
 import { settingsKeyboard, timezoneKeyboard } from '../keyboards/settings.js';
 import { settingsText, timezoneListText } from '../views/settings.views.js';
 import { helpText } from '../views/menu.views.js';
-import { peopleListText, upcomingListText } from '../views/person.views.js';
+import { upcomingListText } from '../views/person.views.js';
 import { ValidationError } from '../../shared/errors/index.js';
+import { startAddPerson } from '../conversations/add-person.js';
+import type { FlowStore } from '../conversations/flow.store.js';
 import type { Services } from '../../container.js';
 
 export interface NavDeps {
   services: Services;
+  flowStore: FlowStore;
 }
 
 /** `nav:*` callbacks: main menu sections. */
@@ -19,7 +22,7 @@ export async function handleNavCallback(
   target: string,
   deps: NavDeps,
 ): Promise<boolean> {
-  const { services } = deps;
+  const { services, flowStore } = deps;
   const lang = ctx.state.lang;
 
   switch (target) {
@@ -28,16 +31,20 @@ export async function handleNavCallback(
       await editOrSend(ctx, t('menu.title', lang), listKeyboard([]));
       return true;
 
-    case 'upcoming': {
+    // `people` used to be a second, alphabetical list. Inline keyboards in the
+    // chat history may still send it, so it maps to the same screen.
+    case 'upcoming':
+    case 'people': {
       await ackCallback(ctx);
-      const items = await services.birthdays.getUpcomingForUser(ctx.state.user.id);
-      await editOrSend(ctx, upcomingListText(items, lang), listKeyboard(items));
+      await showUpcomingList(ctx, services);
       return true;
     }
 
-    case 'people': {
+    // Fallback target of the welcome call-to-action when no deep link is
+    // possible (see `welcomeKeyboard`).
+    case 'add': {
       await ackCallback(ctx);
-      await showPeopleList(ctx, services);
+      await startAddPerson(ctx, flowStore);
       return true;
     }
 
@@ -59,10 +66,10 @@ export async function handleNavCallback(
   }
 }
 
-/** Shared renderer: people list sorted by next birthday occurrence. */
-export async function showPeopleList(ctx: AppContext, services: Services): Promise<void> {
+/** Shared renderer: people sorted by their next birthday occurrence. */
+export async function showUpcomingList(ctx: AppContext, services: Services): Promise<void> {
   const items = await services.birthdays.getUpcomingForUser(ctx.state.user.id);
-  await editOrSend(ctx, peopleListText(items, ctx.state.lang), listKeyboard(items));
+  await editOrSend(ctx, upcomingListText(items, ctx.state.lang), listKeyboard(items));
 }
 
 /** `settings:*` callbacks. */

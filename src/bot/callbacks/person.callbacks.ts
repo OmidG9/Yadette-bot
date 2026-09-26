@@ -14,7 +14,8 @@ import type { Services } from '../../container.js';
 
 export interface PersonCallbackDeps {
   services: Services;
-  showPeopleList: (ctx: AppContext) => Promise<void>;
+  /** Back navigation target: the single birthday list. */
+  showUpcomingList: (ctx: AppContext) => Promise<void>;
 }
 
 /** All `person:*` inline callbacks. Ownership is enforced inside the services. */
@@ -48,7 +49,7 @@ export async function handlePersonCallback(
       const person = await services.persons.delete(userId, personId);
       await services.reminders.deleteForPerson(person.id);
       await editOrSend(ctx, personDeletedText(person.name, lang));
-      await deps.showPeopleList(ctx);
+      await deps.showUpcomingList(ctx);
       return true;
     }
 

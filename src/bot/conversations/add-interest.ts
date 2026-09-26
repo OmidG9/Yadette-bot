@@ -18,13 +18,14 @@ export function createAddInterestFlow(services: Services, store: FlowStore): Flo
   return {
     name: ADD_INTEREST_FLOW,
     initialStep: 'add',
+    menuSteps: ['add'],
     onCancel: async (ctx, state) => {
       await store.clear(ctx.state.user.id);
       const { personId } = readData(state);
       const person = await services.persons.getForUser(ctx.state.user.id, personId);
       await editOrSend(
         ctx,
-        t('addPerson.cancelled', ctx.state.lang),
+        t('flow.cancelled', ctx.state.lang),
         interestsKeyboard(personId, person.interests, ctx.state.lang),
       );
     },

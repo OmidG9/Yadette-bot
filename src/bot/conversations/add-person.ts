@@ -96,9 +96,10 @@ export async function completeAddPerson(
   await store.clear(ctx.state.user.id);
 
   const upcoming = await services.birthdays.getOccurrenceForPerson(ctx.state.user.id, person);
+  const enabledReminders = person.reminders.filter((reminder) => reminder.enabled).length;
   await editOrSend(
     ctx,
-    `${addPersonSavedText(person.name, ctx.state.lang)}\n\n${personDetailsText(upcoming, ctx.state.lang)}`,
+    `${addPersonSavedText(person.name, enabledReminders, ctx.state.lang)}\n\n${personDetailsText(upcoming, ctx.state.lang)}`,
     personDetailsKeyboard(person.id, ctx.state.lang, person.interests.length > 0),
   );
 }
@@ -113,7 +114,9 @@ export async function startAddPerson(ctx: AppContext, store: FlowStore): Promise
     data: { ...initialData() },
     messageId: null,
   });
-  await ctx.reply(t('addPerson.askName', lang), { reply_markup: cancelKeyboard('nav:menu', lang) });
+  await ctx.reply(`${t('addPerson.askName', lang)}\n\n${t('hint.cancel', lang)}`, {
+    reply_markup: cancelKeyboard('nav:menu', lang),
+  });
 }
 
 /**
@@ -124,9 +127,11 @@ export function createAddPersonFlow(store: FlowStore): FlowDefinition {
   return {
     name: ADD_PERSON_FLOW,
     initialStep: 'name',
+    // Every step is menu-aware: a menu press must never be read as an answer.
+    menuSteps: ['name', 'birthday', 'interests', 'notes', 'reminders'],
     onCancel: async (ctx) => {
       await store.clear(ctx.state.user.id);
-      await ctx.reply(t('addPerson.cancelled', ctx.state.lang));
+      await ctx.reply(t('flow.cancelled', ctx.state.lang));
     },
 
     steps: {
@@ -148,9 +153,10 @@ export function createAddPersonFlow(store: FlowStore): FlowDefinition {
         return { next: 'birthday', data: { name }, messageId };
       },
 
-      birthday: async (ctx, _state, text) => {
+      birthday: async (ctx, state, text) => {
         const lang = ctx.state.lang;
         const parsed = parseBirthDate(text);
+        const name = readName(state);
 
         if (!parsed.ok) {
           await editOrSend(ctx, t('addPerson.invalidDate', lang), cancelKeyboard('nav:menu', lang));
@@ -159,7 +165,7 @@ export function createAddPersonFlow(store: FlowStore): FlowDefinition {
 
         const messageId = await editOrSend(
           ctx,
-          `${t('addPerson.askInterests', lang)}\n\n${t('flow.hint', lang)}`,
+          `${t('addPerson.askInterests', lang, { name })}\n\n${t('hint.skip', lang)}`,
           cancelKeyboard('nav:menu', lang),
         );
 
@@ -177,7 +183,7 @@ export function createAddPersonFlow(store: FlowStore): FlowDefinition {
 
         const messageId = await editOrSend(
           ctx,
-          `${t('addPerson.askNotes', lang, { name })}\n\n${t('flow.hint', lang)}`,
+          `${t('addPerson.askNotes', lang, { name })}\n\n${t('hint.skip', lang)}`,
           cancelKeyboard('nav:menu', lang),
         );
 

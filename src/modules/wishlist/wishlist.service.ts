@@ -1,7 +1,7 @@
 /**
  * DISABLED — Phase 2 (wishlist).
  *
- * Placeholder interface only. Yadet's MVP has no wishlist table or handlers.
+ * Placeholder interface only. Yadette's MVP has no wishlist table or handlers.
  */
 export interface WishlistItem {
   id: string;

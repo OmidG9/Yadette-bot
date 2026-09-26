@@ -14,14 +14,12 @@ import { createAddInterestFlow } from './conversations/add-interest.js';
 import { handleStart } from './commands/start.js';
 import { handleCancel } from './commands/cancel.js';
 import { mainMenuLabels, mainMenuKeyboard } from './keyboards/main.js';
-import { listKeyboard } from './keyboards/person.js';
 import { settingsKeyboard } from './keyboards/settings.js';
 import { parseCallbackData } from './callbacks/data.js';
-import { handleNavCallback, handleSettingsCallback, showPeopleList } from './callbacks/nav.callbacks.js';
+import { handleNavCallback, handleSettingsCallback, showUpcomingList } from './callbacks/nav.callbacks.js';
 import { handlePersonCallback } from './callbacks/person.callbacks.js';
 import { handleFlowCallback, handleInterestDelete } from './callbacks/flow.callbacks.js';
 import { handleReminderToggle } from './callbacks/reminder.callbacks.js';
-import { upcomingListText } from './views/person.views.js';
 import { settingsText } from './views/settings.views.js';
 import { helpText } from './views/menu.views.js';
 import { ackCallback, editOrSend } from './helpers.js';
@@ -53,7 +51,7 @@ export function createBot({ token, services, flowStore, client }: CreateBotDeps)
   bot.use(hydrateUser(services));
   bot.use(createFlowMiddleware(flowStore, flows));
 
-  registerCommands(bot);
+  registerCommands(bot, services, flowStore);
   registerMenuButtons(bot, services, flowStore);
   registerCallbackHandler(bot, services, flowStore);
   registerFallbacks(bot);
@@ -62,13 +60,13 @@ export function createBot({ token, services, flowStore, client }: CreateBotDeps)
   return bot;
 }
 
-function registerCommands(bot: Bot<AppContext>): void {
+function registerCommands(bot: Bot<AppContext>, services: Services, flowStore: FlowStore): void {
   bot.command('start', async (ctx) => {
-    await handleStart(ctx);
+    await handleStart(ctx, { services, flowStore });
   });
 
   bot.command('help', async (ctx) => {
-    await ctx.reply(helpText(ctx.state.lang));
+    await ctx.reply(helpText(ctx.state.lang), { parse_mode: 'HTML' });
   });
 }
 
@@ -84,17 +82,8 @@ function registerMenuButtons(bot: Bot<AppContext>, services: Services, flowStore
       return;
     }
 
-    if (pressed === t('menu.people', lang)) {
-      await showPeopleList(ctx, services);
-      return;
-    }
-
     if (pressed === t('menu.upcoming', lang)) {
-      const items = await services.birthdays.getUpcomingForUser(ctx.state.user.id);
-      await ctx.reply(upcomingListText(items, lang), {
-        parse_mode: 'HTML',
-        reply_markup: listKeyboard(items),
-      });
+      await showUpcomingList(ctx, services);
       return;
     }
 
@@ -112,7 +101,7 @@ function registerMenuButtons(bot: Bot<AppContext>, services: Services, flowStore
       return;
     }
 
-    await ctx.reply(helpText(lang), { reply_markup: mainMenuKeyboard(lang) });
+    await ctx.reply(helpText(lang), { parse_mode: 'HTML', reply_markup: mainMenuKeyboard(lang) });
   });
 
   // `/cancel` must work even when no flow is active.
@@ -151,13 +140,13 @@ async function dispatchCallback(
   flowStore: FlowStore,
 ): Promise<boolean> {
   if (data.kind.startsWith('nav:')) {
-    return handleNavCallback(ctx, data.kind.slice(4), { services });
+    return handleNavCallback(ctx, data.kind.slice(4), { services, flowStore });
   }
 
   if (data.kind.startsWith('person:') || data.kind.startsWith('person:edit')) {
     return handlePersonCallback(ctx, data, {
       services,
-      showPeopleList: (context) => showPeopleList(context, services),
+      showUpcomingList: (context) => showUpcomingList(context, services),
     });
   }
 
@@ -170,7 +159,7 @@ async function dispatchCallback(
   }
 
   if (data.kind.startsWith('settings:')) {
-    return handleSettingsCallback(ctx, data, { services });
+    return handleSettingsCallback(ctx, data, { services, flowStore });
   }
 
   return handleFlowCallback(ctx, data, { services, store: flowStore });

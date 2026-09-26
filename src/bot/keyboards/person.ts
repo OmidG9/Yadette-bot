@@ -21,7 +21,7 @@ export function personDetailsKeyboard(
     .text(t('buttons.editReminders', lang), personCallback('reminders', personId))
     .row()
     .text(t('buttons.delete', lang), personCallback('del:ask', personId))
-    .text(t('buttons.back', lang), 'nav:people');
+    .text(t('buttons.back', lang), 'nav:upcoming');
 
   return keyboard;
 }
@@ -44,10 +44,12 @@ export function personEditKeyboard(personId: string, lang: Language = 'fa'): Inl
 export function listKeyboard(items: UpcomingBirthday[]): InlineKeyboard {
   const keyboard = new InlineKeyboard();
 
-  for (const item of items) {
-    keyboard.text(`🎂 ${item.person.name}`, personCallback('view', item.person.id));
+  if (items.length > 0) {
+    for (const item of items) {
+      keyboard.text(`🎂 ${item.person.name}`, personCallback('view', item.person.id));
+    }
+    keyboard.row();
   }
 
-  keyboard.row().text(t('buttons.home'), 'nav:menu');
-  return keyboard;
+  return keyboard.text(t('buttons.home'), 'nav:menu');
 }

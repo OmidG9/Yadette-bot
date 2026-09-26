@@ -1,9 +1,9 @@
-# Yadet (یادت) — Telegram Birthday Assistant
+# Yadette (یادته) — Telegram Birthday Assistant
 ## Production-Ready MVP Implementation Specification
 
 You are a senior full-stack TypeScript engineer and software architect.
 
-Your task is to **fully implement the Yadet (یادت) Telegram Bot MVP** according to this specification.
+Your task is to **fully implement the Yadette (یادته) Telegram Bot MVP** according to this specification.
 
 The goal is NOT to build a prototype or a throwaway demo.
 
@@ -13,8 +13,8 @@ Build a **small, production-ready, maintainable MVP** with a clean modular archi
 
 # 1. Product Definition
 
-**Product name:** Yadet  
-**Persian name:** یادت  
+**Product name:** Yadette  
+**Persian name:** یادته  
 **Product type:** Telegram Birthday Assistant
 
 Core concept:
@@ -46,7 +46,7 @@ However, the architecture must make future AI integration easy.
 
 # 2. Core Product Philosophy
 
-Yadet should feel:
+Yadette should feel:
 
 - Simple
 - Fast
@@ -471,9 +471,9 @@ Then show a welcome message.
 Example tone:
 
 ```text
-🎂 به یادت خوش اومدی!
+🎂 به یادته خوش اومدی!
 
-یادت کمک می‌کنه تولد آدم‌های مهم زندگیت رو فراموش نکنی.
+یادته کمک می‌کنه تولد آدم‌های مهم زندگیت رو فراموش نکنی.
 
 از همین الان می‌تونی اولین نفر رو اضافه کنی.
 ```
@@ -572,7 +572,7 @@ Optional.
 Example:
 
 ```text
-📝 نکته‌ای درباره علی هست که دوست داری یادت بمونه؟
+📝 نکته‌ای درباره علی هست که دوست داری یادته بمونه؟
 ```
 
 Allow:
@@ -763,7 +763,7 @@ Example:
 ❤️ علایق:
 گیم، فوتبال، قهوه
 
-یادت نره یه کاری براش بکنی 😉
+یادته نره یه کاری براش بکنی 😉
 ```
 
 For birthday day:
@@ -926,7 +926,7 @@ docker-compose.yml
 Docker Compose should provide:
 
 ```text
-yadet-bot
+Yadette-bot
 postgres
 ```
 
@@ -1225,7 +1225,7 @@ Create a comprehensive but practical README containing:
 
 ## Project
 
-What Yadet is.
+What Yadette is.
 
 ## Features
 
@@ -1408,7 +1408,7 @@ Do not claim completion if these checks fail.
 
 The final result must be a working Telegram bot named:
 
-# Yadet — یادت
+# Yadette — یادته
 
 It should provide a polished MVP experience centered around:
 
@@ -1426,7 +1426,7 @@ while keeping future features modular and disabled.
 
 The most important principle:
 
-> **Build the smallest production-quality version of Yadet that people can actually use today, while making tomorrow's features easy to add.**
+> **Build the smallest production-quality version of Yadette that people can actually use today, while making tomorrow's features easy to add.**
 
 Do not turn the MVP into an unnecessarily large system.
 

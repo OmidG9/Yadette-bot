@@ -6,11 +6,12 @@ import { Scheduler } from './modules/reminders/reminder.scheduler.js';
 import { BirthdayReminderJob } from './jobs/birthday-reminder.job.js';
 import { logger } from './shared/logger/index.js';
 import { toError } from './shared/errors/index.js';
+import { t } from './shared/i18n/index.js';
 
 async function main(): Promise<void> {
   logger.info(
     { event: 'app.starting', env: env.NODE_ENV, timezone: env.DEFAULT_TIMEZONE },
-    'starting Yadet bot',
+    'starting Yadette bot',
   );
 
   await connectDatabase();
@@ -20,6 +21,13 @@ async function main(): Promise<void> {
 
   await bot.init();
   logger.info({ event: 'bot.initialized', username: bot.botInfo.username }, 'telegram bot ready');
+
+  // Visible shortcut list in the Telegram UI: /start, /help, /cancel.
+  await bot.api.setMyCommands([
+    { command: 'start', description: t('commands.start') },
+    { command: 'help', description: t('commands.help') },
+    { command: 'cancel', description: t('commands.cancel') },
+  ]);
 
   const job = new BirthdayReminderJob({ reminders: services.reminders, users: services.users, bot });
   const scheduler = new Scheduler([job], env.REMINDER_CHECK_INTERVAL_MS);

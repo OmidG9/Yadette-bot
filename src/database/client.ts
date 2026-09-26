@@ -4,7 +4,7 @@ import { logger } from '../shared/logger/index.js';
 
 /**
  * Single Prisma client for the whole process.
- * Yadet is a modular monolith, so one connection pool is enough.
+ * Yadette is a modular monolith, so one connection pool is enough.
  */
 export const prisma = new PrismaClient({
   log: env.LOG_LEVEL === 'debug' ? ['warn', 'error'] : ['error'],

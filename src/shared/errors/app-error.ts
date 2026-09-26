@@ -20,6 +20,11 @@ export class AppError extends Error {
     super(message, { cause: options.cause });
     this.name = new.target.name;
   }
+
+  /** Stable, non-sensitive identifier used to pick the message a user sees. */
+  get code(): string {
+    return this.options.code;
+  }
 }
 
 export class ValidationError extends AppError {

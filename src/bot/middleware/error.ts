@@ -1,9 +1,27 @@
 import type { MiddlewareFn } from 'grammy';
-import { t } from '../../shared/i18n/index.js';
-import { toError } from '../../shared/errors/index.js';
+import { t, type Language } from '../../shared/i18n/index.js';
+import { AppError, toError } from '../../shared/errors/index.js';
 import { logger } from '../../shared/logger/index.js';
 import { ackCallback } from '../helpers.js';
 import type { AppContext } from '../context.js';
+
+/**
+ * A specific message when the failure is understandable, a generic one
+ * otherwise. Anything technical stays in the logs.
+ */
+function userFacingText(error: AppError, lang: Language): string {
+  switch (error.code) {
+    case 'NOT_FOUND':
+      return t('errors.notFound', lang);
+    case 'FORBIDDEN':
+      return t('errors.forbidden', lang);
+    case 'VALIDATION_ERROR':
+    case 'CONFLICT':
+      return t('errors.invalidInput', lang);
+    default:
+      return t('errors.generic', lang);
+  }
+}
 
 /**
  * Central error handling (§23).
@@ -33,7 +51,8 @@ export function errorHandler(): MiddlewareFn<AppContext> {
       await ackCallback(ctx);
 
       try {
-        const text = t('errors.generic', ctx.state?.lang ?? 'fa');
+        const lang = ctx.state?.lang ?? 'fa';
+        const text = error instanceof AppError ? userFacingText(error, lang) : t('errors.generic', lang);
         if (ctx.callbackQuery?.message) {
           await ctx.editMessageText(text).catch(() => undefined);
         } else {

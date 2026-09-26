@@ -3,15 +3,15 @@ services:
     image: postgres:16-alpine
     restart: unless-stopped
     environment:
-      POSTGRES_USER: ${POSTGRES_USER:-yadet}
-      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-yadet}
-      POSTGRES_DB: ${POSTGRES_DB:-yadet}
+      POSTGRES_USER: ${POSTGRES_USER:-yadette}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-yadette}
+      POSTGRES_DB: ${POSTGRES_DB:-yadette}
     ports:
       - '5432:5432'
     volumes:
-      - yadet-db:/var/lib/postgresql/data
+      - yadette-db:/var/lib/postgresql/data
     healthcheck:
-      test: ['CMD-SHELL', 'pg_isready -U ${POSTGRES_USER:-yadet} -d ${POSTGRES_DB:-yadet}']
+      test: ['CMD-SHELL', 'pg_isready -U ${POSTGRES_USER:-yadette} -d ${POSTGRES_DB:-yadette}']
       interval: 5s
       timeout: 5s
       retries: 10
@@ -22,7 +22,7 @@ services:
       target: migrate
     command: ['npx', 'prisma', 'migrate', 'deploy']
     environment:
-      DATABASE_URL: postgresql://${POSTGRES_USER:-yadet}:${POSTGRES_PASSWORD:-yadet}@db:5432/${POSTGRES_DB:-yadet}?schema=public
+      DATABASE_URL: postgresql://${POSTGRES_USER:-yadette}:${POSTGRES_PASSWORD:-yadette}@db:5432/${POSTGRES_DB:-yadette}?schema=public
     depends_on:
       db:
         condition: service_healthy
@@ -34,7 +34,7 @@ services:
     environment:
       NODE_ENV: production
       BOT_TOKEN: ${BOT_TOKEN:?BOT_TOKEN is required}
-      DATABASE_URL: postgresql://${POSTGRES_USER:-yadet}:${POSTGRES_PASSWORD:-yadet}@db:5432/${POSTGRES_DB:-yadet}?schema=public
+      DATABASE_URL: postgresql://${POSTGRES_USER:-yadette}:${POSTGRES_PASSWORD:-yadette}@db:5432/${POSTGRES_DB:-yadette}?schema=public
       DEFAULT_TIMEZONE: ${DEFAULT_TIMEZONE:-Asia/Tehran}
       DEFAULT_LANGUAGE: ${DEFAULT_LANGUAGE:-fa}
       REMINDER_CHECK_INTERVAL_MS: ${REMINDER_CHECK_INTERVAL_MS:-60000}
@@ -46,4 +46,4 @@ services:
         condition: service_completed_successfully
 
 volumes:
-  yadet-db:
+  yadette-db:

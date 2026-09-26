@@ -17,7 +17,7 @@ export function hydrateUser(services: Services): MiddlewareFn<AppContext> {
       // in groups is otherwise impossible to diagnose.
       logger.warn(
         { event: 'bot.update.ignored', chatType: ctx.chat?.type, updateId: ctx.update.update_id },
-        'ignoring update: Yadet only works in a private chat with @BotFather',
+        'ignoring update: Yadette only works in a private chat with @BotFather',
       );
       return;
     }

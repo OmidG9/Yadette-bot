@@ -37,7 +37,7 @@ export interface FlowDefinition {
   onFinish?: (ctx: AppContext, state: FlowState) => Promise<void>;
 }
 
-const CANCEL_TEXTS = new Set(['❌ لغو', '/cancel@yadet_bot', 'لغو', 'cancel', '/cancel']);
+const CANCEL_TEXTS = new Set(['❌ لغو', '/cancel@yadette_bot', 'لغو', 'cancel', '/cancel']);
 
 /**
  * Conversation middleware.
@@ -85,7 +85,7 @@ export function createFlowMiddleware(
       if (flow.onCancel) {
         await flow.onCancel(ctx, state);
       } else {
-        await ctx.reply(t('addPerson.cancelled', lang));
+        await ctx.reply(t('flow.cancelled', lang));
       }
       return;
     }

@@ -53,7 +53,7 @@ export function reminderNotificationText(due: DueNotification, lang: Language): 
   parts.push(t('notification.date', lang, { date }));
 
   if (age !== null) {
-    parts.push(`🎂 ${toPersianDigits(age)} سال`);
+    parts.push(t('notification.age', lang, { age: toPersianDigits(age) }));
   }
 
   const interests = person.interests.map((interest) => interest.title);

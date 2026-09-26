@@ -1,6 +1,6 @@
 /**
  * Minimal type declarations for `jalaali-js` (the package ships plain JS).
- * Only the conversion helpers Yadet actually uses are declared.
+ * Only the conversion helpers Yadette actually uses are declared.
  */
 declare module 'jalaali-js' {
   interface JalaaliDateObject {

@@ -1,7 +1,7 @@
 /**
  * DISABLED — Phase 3 (AI features).
  *
- * Yadet's MVP is explicitly AI-free. This file only documents the seam: when AI
+ * Yadette's MVP is explicitly AI-free. This file only documents the seam: when AI
  * arrives it will be a new module implementing `AIService`, injected next to the
  * existing services. No provider, key, or call exists in this codebase.
  */

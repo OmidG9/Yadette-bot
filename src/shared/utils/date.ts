@@ -77,6 +77,14 @@ export const COMMON_TIMEZONES = [
   'UTC',
 ] as const;
 
+/**
+ * The zones actually offered in the settings picker.
+ *
+ * The picker text and its keyboard must list the exact same things, so both
+ * read this single filtered list instead of curating their own.
+ */
+export const AVAILABLE_TIMEZONES: readonly string[] = COMMON_TIMEZONES.filter(isValidTimeZone);
+
 // ---------------------------------------------------------------------------
 // Timezone helpers
 // ---------------------------------------------------------------------------

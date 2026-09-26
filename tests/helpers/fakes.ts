@@ -164,6 +164,17 @@ export class FakeUserRepository implements UserRepository {
     // no-op
   }
 
+  /** Test helper: users left in the store. */
+  async delete(id: string): Promise<void> {
+    const index = this.users.findIndex((user) => user.id === id);
+    if (index >= 0) this.users.splice(index, 1);
+  }
+
+  /** Test helper. */
+  count(): number {
+    return this.users.length;
+  }
+
   async findUsersWithRemindersEnabled(): Promise<
     Pick<UserRecord, 'id' | 'timezone' | 'language'>[]
   > {

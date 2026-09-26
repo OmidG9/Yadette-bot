@@ -86,7 +86,10 @@ describe('messages always carry parse_mode', () => {
 });
 
 describe('the greeting that leaked raw tags', () => {
-  function fakeCtx(): { ctx: AppContext; sent: { text: string; extra?: Record<string, unknown> }[] } {
+  function fakeCtx(): {
+    ctx: AppContext;
+    sent: { text: string; extra?: Record<string, unknown> }[];
+  } {
     const sent: { text: string; extra?: Record<string, unknown> }[] = [];
     const ctx = {
       state: { lang: 'fa', user: fakeUser({ firstName: 'OmiD' }) },
@@ -123,7 +126,7 @@ describe('the greeting that leaked raw tags', () => {
 describe('about text', () => {
   it('explains the product, the flow, privacy and the commands', () => {
     const text = aboutText('fa');
-    expect(text).toContain('درباره‌ی یادت');
+    expect(text).toContain('درباره‌ی یادته');
     expect(text).toContain('تولد');
     expect(text).toContain('۷ روز قبل');
     expect(text).toContain('حریم خصوصی');

@@ -25,7 +25,7 @@ function user(overrides: Partial<UserRecord> = {}): UserRecord {
 describe('first-run welcome', () => {
   it('explains the product and the privacy promise to a brand new user', () => {
     const text = welcomeText(user(), true, 0, 'fa');
-    expect(text).toContain('من یادم');
+    expect(text).toContain('من «یادته» هستم');
     expect(text).toContain('🔒');
     expect(text).not.toContain('{{');
   });
@@ -35,7 +35,7 @@ describe('first-run welcome', () => {
     expect(text).toContain('امیر');
     expect(text).toContain('۳ نفر');
     expect(text).toContain('دکمه‌های زیر');
-    expect(text).not.toContain('من یادم');
+    expect(text).not.toContain('من «یادته» هستم');
   });
 
   it('tells a returning user with an empty list how to start', () => {
@@ -74,7 +74,7 @@ describe('welcome call to action', () => {
       '🎂 تولدها',
       '⚙️ تنظیمات',
       'ℹ️ راهنما',
-      '📖 درباره یادت',
+      '📖 درباره‌ی یادته',
     ]);
   });
 

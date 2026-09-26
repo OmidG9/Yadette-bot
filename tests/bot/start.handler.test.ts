@@ -33,7 +33,7 @@ describe('/start end to end', () => {
     await handleStart(ctx, deps(0));
 
     const welcome = sent[0];
-    expect(welcome?.text).toContain('سلام! من یادم');
+    expect(welcome?.text).toContain('سلام! من «یادته» هستم');
     expect(welcome?.text).toContain('دکمه‌های زیر');
     expect(welcome?.extra?.parse_mode).toBe('HTML');
 
@@ -44,7 +44,7 @@ describe('/start end to end', () => {
       '🎂 تولدها',
       '⚙️ تنظیمات',
       'ℹ️ راهنما',
-      '📖 درباره یادت',
+      '📖 درباره‌ی یادته',
     ]);
 
     // First contact also installs the sticky reply keyboard.
@@ -59,8 +59,9 @@ describe('/start end to end', () => {
     expect(sent[0]?.text).toContain('خوش اومدی');
     expect(sent[0]?.text).toContain('۲ نفر');
 
-    const rows = (sent[0]?.extra?.reply_markup as { inline_keyboard: { callback_data?: string }[][] })
-      .inline_keyboard;
+    const rows = (
+      sent[0]?.extra?.reply_markup as { inline_keyboard: { callback_data?: string }[][] }
+    ).inline_keyboard;
     for (const row of rows) {
       for (const button of row) {
         if (!button.callback_data) continue;

@@ -40,6 +40,12 @@ export interface UserRepository {
   ): Promise<UserRecord>;
   updateSettings(id: string, input: UpdateUserSettingsInput): Promise<UserRecord>;
   touchLastSeen(id: string): Promise<void>;
+  /**
+   * Removes the user row. Every child table hangs off it with
+   * `ON DELETE CASCADE`, so this also erases people, interests, reminders,
+   * notification logs and conversation state. Must be idempotent.
+   */
+  delete(id: string): Promise<void>;
   /** Users with reminders globally enabled, used by the scheduler. */
   findUsersWithRemindersEnabled(): Promise<Pick<UserRecord, 'id' | 'timezone' | 'language'>[]>;
 }

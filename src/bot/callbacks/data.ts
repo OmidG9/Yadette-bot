@@ -36,7 +36,15 @@ const PERSON_ACTIONS = [
   'interests',
 ] as const;
 
-const SETTINGS_ACTIONS = ['reminders', 'timezone', 'tz:set', 'language'] as const;
+const SETTINGS_ACTIONS = [
+  'reminders',
+  'timezone',
+  'tz:set',
+  'language',
+  'data:ask',
+  'data:yes',
+  'data:no',
+] as const;
 
 function isOneOf<T extends readonly string[]>(value: string, options: T): boolean {
   return (options as readonly string[]).includes(value);
@@ -73,9 +81,10 @@ function toCandidate(raw: string): Record<string, unknown> {
         : { kind: 'reminder:toggle', personId: b, days: c };
     case 'settings':
       // settings:tz:set:<Area/City> — the zone may contain slashes, never colons.
-      return a === 'tz'
-        ? { kind: 'settings:tz:set', timezone: c }
-        : { kind: `settings:${a ?? ''}` };
+      if (a === 'tz') return { kind: 'settings:tz:set', timezone: c };
+      // settings:data:<ask|yes|no> — a two-step destructive confirmation.
+      if (a === 'data') return { kind: `settings:data:${b ?? 'ask'}` };
+      return { kind: `settings:${a ?? ''}` };
     default:
       return { kind: head ?? '' };
   }
@@ -120,6 +129,8 @@ export const reminderToggleCallback = (personId: string, days: number): string =
 export const reminderPendingCallback = (days: number): string => `reminder:pending:${days}`;
 
 export const timezoneCallback = (timezone: string): string => `settings:tz:set:${timezone}`;
+
+export const deleteDataCallback = (action: 'ask' | 'yes' | 'no'): string => `settings:data:${action}`;
 
 export const navCallback = (
   target: 'menu' | 'upcoming' | 'people' | 'settings' | 'help' | 'add' | 'about',

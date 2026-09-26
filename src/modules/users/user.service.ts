@@ -75,6 +75,18 @@ export class UserService {
     await this.users.touchLastSeen(userId);
   }
 
+  /**
+   * Right to be forgotten (§ privacy): the user row is the aggregate root, so
+   * deleting it cascades to people, interests, reminders, notification logs and
+   * conversation state. Nothing identifiable is left behind.
+   *
+   * Idempotent — erasing an already erased account is a no-op rather than an
+   * error, so a double tap on the confirm button cannot fail.
+   */
+  async deleteAccount(userId: string): Promise<void> {
+    await this.users.delete(userId);
+  }
+
   /** Best-effort display name for greetings. */
   displayName(user: UserRecord): string {
     return user.firstName?.trim() || user.username?.trim() || 'دوست عزیز';

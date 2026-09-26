@@ -1,13 +1,20 @@
 import { t } from '../../shared/i18n/index.js';
+import { logger } from '../../shared/logger/index.js';
 import type { AppContext } from '../context.js';
-import { ackCallback, editOrSend, sendText } from '../helpers.js';
+import { ackCallback, editOrSend } from '../helpers.js';
 import { listKeyboard } from '../keyboards/person.js';
-import { settingsKeyboard, timezoneKeyboard } from '../keyboards/settings.js';
-import { settingsText, timezoneListText } from '../views/settings.views.js';
+import { deleteDataKeyboard, settingsKeyboard, timezoneKeyboard } from '../keyboards/settings.js';
+import {
+  dataErasedText,
+  deleteDataConfirmText,
+  settingsText,
+  timezoneListText,
+} from '../views/settings.views.js';
 import { helpText, aboutText } from '../views/menu.views.js';
 import { upcomingListText } from '../views/person.views.js';
-import { ValidationError } from '../../shared/errors/index.js';
+import { ValidationError, toError } from '../../shared/errors/index.js';
 import { startAddPerson } from '../conversations/add-person.js';
+import { hydrateContext } from '../middleware/hydrate-user.js';
 import type { FlowStore } from '../conversations/flow.store.js';
 import type { Services } from '../../container.js';
 
@@ -26,9 +33,11 @@ export async function handleNavCallback(
   const lang = ctx.state.lang;
 
   switch (target) {
+    // The real list, not an empty one: this is the only way out of the settings
+    // and timezone screens, and it is also where `/cancel` lands.
     case 'menu':
       await ackCallback(ctx);
-      await editOrSend(ctx, t('menu.title', lang), listKeyboard([]));
+      await showUpcomingList(ctx, services);
       return true;
 
     // `people` used to be a second, alphabetical list. Inline keyboards in the
@@ -92,7 +101,11 @@ export async function handleSettingsCallback(
   switch (data.kind) {
     case 'settings:reminders': {
       const settings = await services.settings.toggleReminders(userId);
-      await editOrSend(ctx, settingsText(settings, lang), settingsKeyboard(settings, lang));
+      await editOrSend(
+        ctx,
+        settingsText(settings, lang, t('settings.saved', lang)),
+        settingsKeyboard(settings, lang),
+      );
       return true;
     }
 
@@ -109,17 +122,76 @@ export async function handleSettingsCallback(
     case 'settings:tz:set': {
       if (!data.timezone) throw new ValidationError('Missing timezone');
       const settings = await services.settings.setTimezone(userId, data.timezone);
+      await editOrSend(
+        ctx,
+        settingsText(
+          settings,
+          lang,
+          t('settings.savedTimezone', lang, { value: settings.timezone }),
+        ),
+        settingsKeyboard(settings, lang),
+      );
+      return true;
+    }
+
+    // Only Persian exists so far, but the answer stays on the settings screen:
+    // a bare message with no keyboard used to be a dead end.
+    case 'settings:language': {
+      const settings = await services.settings.get(userId);
+      await editOrSend(
+        ctx,
+        settingsText(settings, lang, t('settings.languageOnlyFa', lang)),
+        settingsKeyboard(settings, lang),
+      );
+      return true;
+    }
+
+    case 'settings:data:ask': {
+      await editOrSend(ctx, deleteDataConfirmText(lang), deleteDataKeyboard(lang));
+      return true;
+    }
+
+    case 'settings:data:no': {
+      const settings = await services.settings.get(userId);
       await editOrSend(ctx, settingsText(settings, lang), settingsKeyboard(settings, lang));
       return true;
     }
 
-    case 'settings:language': {
-      await ackCallback(ctx);
-      await sendText(ctx, t('settings.languageOnlyFa', lang));
+    case 'settings:data:yes': {
+      await eraseAllData(ctx, services);
       return true;
     }
 
     default:
       return false;
   }
+}
+
+/**
+ * Right to be forgotten.
+ *
+ * Deleting the `User` row cascades to people, interests, reminders, notification
+ * logs and conversation state, so nothing is left behind. `telegramId` is
+ * unique, so re-hydrating immediately creates a brand new user: the very next
+ * message is greeted like a first contact, with an empty list and default
+ * settings, exactly as if this user had never existed.
+ */
+async function eraseAllData(ctx: AppContext, services: Services): Promise<void> {
+  const deletedId = ctx.state.user.id;
+
+  await services.users.deleteAccount(deletedId);
+
+  // `ctx.state` still points at the deleted row, and a second tap on the
+  // confirm button must land on a live user rather than fail.
+  const user = await hydrateContext(ctx, services);
+  await services.users.markSeen(user.id).catch((error: unknown) => {
+    logger.warn(
+      { event: 'user.touch.failed', userId: user.id, err: toError(error) },
+      'lastSeenAt update failed after data erasure',
+    );
+  });
+
+  logger.info({ event: 'user.data_erased', userId: user.id }, 'user erased all their data');
+
+  await editOrSend(ctx, dataErasedText(ctx.state.lang));
 }

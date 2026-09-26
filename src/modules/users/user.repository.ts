@@ -87,6 +87,14 @@ export class PrismaUserRepository implements UserRepository {
     await this.db.user.update({ where: { id }, data: { lastSeenAt: new Date() } });
   }
 
+  /**
+   * `deleteMany` instead of `delete`: erasing your data twice must not explode.
+   * The foreign keys cascade, so one statement wipes every dependent row.
+   */
+  async delete(id: string): Promise<void> {
+    await this.db.user.deleteMany({ where: { id } });
+  }
+
   async findUsersWithRemindersEnabled(): Promise<Pick<UserRecord, 'id' | 'timezone' | 'language'>[]> {
     const rows = await this.db.user.findMany({
       where: { reminderEnabled: true },

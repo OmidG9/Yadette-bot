@@ -98,7 +98,12 @@ export function createFlowMiddleware(
     const handler = flow.steps[state.step];
     if (!handler) {
       logger.error(
-        { event: 'flow.step.missing', userId: ctx.state.user.id, flow: flow.name, step: state.step },
+        {
+          event: 'flow.step.missing',
+          userId: ctx.state.user.id,
+          flow: flow.name,
+          step: state.step,
+        },
         'flow step not found',
       );
       await store.clear(ctx.state.user.id);

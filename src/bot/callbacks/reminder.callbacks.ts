@@ -2,7 +2,6 @@ import type { AppContext } from '../context.js';
 import { ackCallback, editOrSend } from '../helpers.js';
 import { reminderKeyboard } from '../keyboards/reminder.js';
 import { reminderSettingsText } from '../views/reminder.views.js';
-import { ValidationError } from '../../shared/errors/index.js';
 import type { Services } from '../../container.js';
 
 /**
@@ -17,9 +16,8 @@ export async function handleReminderToggle(
   const lang = ctx.state.lang;
   const userId = ctx.state.user.id;
   const personId = data.personId ?? '';
-  const days = data.days;
-
-  if (days === undefined) throw new ValidationError('Missing reminder offset');
+  // `parseCallbackData` guarantees `days` for this kind.
+  const days = data.days as number;
 
   const person = await services.persons.getForUser(userId, personId);
   const current = await services.reminders.listForPerson(userId, person.id);

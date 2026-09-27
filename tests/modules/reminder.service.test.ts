@@ -84,6 +84,42 @@ describe('ReminderService.findDueNotifications', () => {
     expect(due).toHaveLength(0);
   });
 
+  /**
+   * Regression: "already sent" used to be checked in the job, after the due list
+   * was built. A birthday stays due for the whole day, so every scheduler tick
+   * re-reported the same reminder forever even though nothing was resent.
+   */
+  it('stops reporting a slot that has already been delivered', async () => {
+    const birthday = new Date('2026-10-10T06:00:00.000Z');
+
+    const first = await service.findDueNotifications(birthday);
+    expect(first).toHaveLength(1);
+    expect(await service.claim(only(first))).not.toBeNull();
+
+    expect(await service.findDueNotifications(birthday)).toHaveLength(0);
+  });
+
+  it('keeps reporting a slot released after a failed delivery', async () => {
+    const birthday = new Date('2026-10-10T06:00:00.000Z');
+    const claimed = await service.claim(only(await service.findDueNotifications(birthday)));
+    expect(claimed).not.toBeNull();
+
+    await service.release(claimed!.log.id);
+
+    expect(await service.findDueNotifications(birthday)).toHaveLength(1);
+  });
+
+  it('reports the same slot again for the next Jalali year', async () => {
+    const thisYear = new Date('2026-10-10T06:00:00.000Z');
+    await service.claim(only(await service.findDueNotifications(thisYear)));
+
+    const nextYear = new Date('2027-10-10T06:00:00.000Z');
+    const due = await service.findDueNotifications(nextYear);
+
+    expect(due).toHaveLength(1);
+    expect(due[0]!.occurrence.jalaliYear).toBe(1406);
+  });
+
   it('skips disabled offsets', async () => {
     const all = await reminders.findForPerson(person.id, person.userId);
     const birthdayReminder = all.find((item) => item.daysBefore === 0)!;

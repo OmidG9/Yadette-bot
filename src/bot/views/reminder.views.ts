@@ -33,9 +33,7 @@ export function reminderNotificationText(due: DueNotification, lang: Language): 
   const date = formatJalali(occurrence.jalali.jm, occurrence.jalali.jd);
 
   if (daysBefore === 0) {
-    return [t('notification.today', lang, { name }), '', t('notification.todayBody', lang, { name })].join(
-      '\n',
-    );
+    return [t('notification.today', lang, { name }), '', t('notification.todayBody', lang)].join('\n');
   }
 
   const age = ageOnBirthday(
@@ -47,7 +45,7 @@ export function reminderNotificationText(due: DueNotification, lang: Language): 
 
   parts.push(
     t('notification.daysLeft', lang, {
-      count: daysBefore === 1 ? '۱ روز' : `${toPersianDigits(daysBefore)} روز`,
+      count: t('countdown.daysCount', lang, { count: toPersianDigits(daysBefore) }),
     }),
   );
   parts.push(t('notification.date', lang, { date }));
@@ -56,7 +54,8 @@ export function reminderNotificationText(due: DueNotification, lang: Language): 
     parts.push(t('notification.age', lang, { age: toPersianDigits(age) }));
   }
 
-  const interests = person.interests.map((interest) => interest.title);
+  // Every interpolated value reaches Telegram as HTML, so user text is escaped.
+  const interests = person.interests.map((interest) => escapeHtml(interest.title));
   if (interests.length > 0) {
     parts.push('', t('notification.interests', lang, { list: interests.join('، ') }));
   }

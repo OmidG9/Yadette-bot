@@ -70,8 +70,3 @@ export function cleanNotes(raw: string): string | null {
   if (value.length === 0) return null;
   return truncate(value, MAX_NOTES_LENGTH);
 }
-
-/** Validates identifiers that arrive from Telegram callback data. */
-export function isSafeId(value: string): boolean {
-  return /^[A-Za-z0-9_-]{1,64}$/.test(value);
-}

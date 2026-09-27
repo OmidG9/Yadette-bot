@@ -52,41 +52,90 @@ export async function editOrSend(
   if (messageId !== undefined) return messageId;
 
   const sent = await ctx.reply(text, extra);
+  ctx.state.promptMessageId = sent.message_id;
   return sent.message_id;
 }
 
-/** Replaces the message a callback belongs to (or the message just sent). */
+/**
+ * Replaces the message that should be rewritten in place.
+ *
+ * Order matters: the bot's own previous prompt comes first, because editing
+ * `ctx.message` would replace the text the user just typed. A callback query
+ * carries its own message, which is the right target for a button press.
+ */
 export async function editCurrentMessage(
   ctx: AppContext,
   text: string,
   extra: MessageExtra,
 ): Promise<number | undefined> {
   const chatId = ctx.chat?.id;
-  const messageId = ctx.callbackQuery?.message?.message_id ?? ctx.message?.message_id;
+  const messageId =
+    ctx.callbackQuery?.message?.message_id ??
+    ctx.state.promptMessageId ??
+    ctx.message?.message_id;
   if (chatId === undefined || messageId === undefined) return undefined;
 
-  const edited = await editMessageById(ctx, chatId, messageId, text, extra.reply_markup);
-  return edited ? messageId : undefined;
+  const outcome = await editMessageById(ctx, chatId, messageId, text, extra.reply_markup);
+  // `unchanged` still counts as success: the requested screen is already up.
+  return outcome === 'unavailable' ? undefined : messageId;
 }
 
-/** Edits a specific message by id. Returns `false` when Telegram refuses. */
+/** Outcome of trying to rewrite a message in place. */
+export type EditOutcome =
+  /** Telegram accepted the edit. */
+  | 'edited'
+  /**
+   * The target already shows exactly this text. The screen the user asked for is
+   * already there, so posting a new message would be a visible duplicate.
+   */
+  | 'unchanged'
+  /**
+   * The message is gone or can no longer be edited (it predates the bot, the
+   * user deleted it, …). Only this case justifies sending a replacement.
+   */
+  | 'unavailable';
+
+/**
+ * Edits a specific message by id, reporting what happened instead of collapsing
+ * it into a boolean.
+ *
+ * Anything else — the bot was blocked, the chat is gone, we are rate limited —
+ * is rethrown, because swallowing it would hide the real cause from the logs.
+ */
 export async function editMessageById(
   ctx: AppContext,
   chatId: number,
   messageId: number,
   text: string,
   keyboard?: InlineKeyboard,
-): Promise<boolean> {
+): Promise<EditOutcome> {
   try {
     await ctx.api.editMessageText(chatId, messageId, text, {
       parse_mode: 'HTML',
       ...(keyboard ? { reply_markup: keyboard } : {}),
     });
-    return true;
-  } catch {
-    // Telegram throws when the new text is identical or the message is too old.
-    return false;
+    return 'edited';
+  } catch (error) {
+    const outcome = classifyEditError(error);
+    if (outcome !== null) return outcome;
+    throw error;
   }
+}
+
+/**
+ * The two failures that Telegram reports while editing, mapped to what the
+ * caller should do about them.
+ */
+function classifyEditError(error: unknown): EditOutcome | null {
+  const description = (error as { description?: string } | null)?.description ?? '';
+  if (description.includes('message is not modified')) return 'unchanged';
+  if (
+    description.includes('message to edit not found') ||
+    description.includes("message can't be edited")
+  ) {
+    return 'unavailable';
+  }
+  return null;
 }
 
 /** Sends the main menu with the reply keyboard attached. */

@@ -58,6 +58,20 @@ export interface ReminderRepository {
     birthdayYear: number;
     daysBefore: number;
   }): Promise<NotificationLogRecord | null>;
+  /** Same, for every slot this user has ever been notified about. */
+  findLogKeys(userId: string): Promise<Set<string>>;
   /** Releases a claim when delivery failed, so the next tick can retry. */
   releaseNotification(logId: string): Promise<void>;
+}
+
+/**
+ * Identity of one notification slot: which person, which Jalali year, which
+ * offset. Shared so the "already sent" check and its batch form cannot drift.
+ */
+export function notificationSlotKey(
+  personId: string,
+  birthdayYear: number,
+  daysBefore: number,
+): string {
+  return `${personId}:${birthdayYear}:${daysBefore}`;
 }

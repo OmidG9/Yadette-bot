@@ -144,9 +144,16 @@ async function dispatchCallback(
     return handleNavCallback(ctx, data.kind.slice(4), { services, flowStore });
   }
 
-  if (data.kind.startsWith('person:') || data.kind.startsWith('person:edit')) {
+  // `person:edit` and `person:edit:<field>` must be matched before the
+  // `person:` prefix below, which would otherwise swallow them.
+  if (data.kind === 'person:edit' || data.kind.startsWith('person:edit:')) {
+    return handleFlowCallback(ctx, data, { services, store: flowStore });
+  }
+
+  if (data.kind.startsWith('person:')) {
     return handlePersonCallback(ctx, data, {
       services,
+      flowStore,
       showUpcomingList: (context) => showUpcomingList(context, services),
     });
   }
@@ -175,7 +182,7 @@ function registerFallbacks(bot: Bot<AppContext>): void {
 
 /** Last line of defence: a crash must never take the process down (§23). */
 function registerCatch(bot: Bot<AppContext>): void {
-  bot.catch((err) => {
+  bot.catch(async (err) => {
     const error = err.error;
     const ctx = err.ctx;
 
@@ -189,6 +196,12 @@ function registerCatch(bot: Bot<AppContext>): void {
         },
         'telegram api error',
       );
+      // Nothing can be delivered right now, but the button still has to stop
+      // spinning once Telegram is reachable again. Failure is ignored: a
+      // Telegram outage must not turn into a second, unhandled rejection.
+      if (ctx.callbackQuery) {
+        await ctx.answerCallbackQuery().catch(() => undefined);
+      }
       return;
     }
 

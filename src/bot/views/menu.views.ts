@@ -4,7 +4,7 @@ import { escapeHtml } from '../../shared/utils/text.js';
 import type { UserRecord } from '../../modules/users/user.types.js';
 
 function displayName(user: UserRecord): string {
-  return escapeHtml(user.firstName ?? user.username ?? 'دوست عزیز');
+  return escapeHtml(user.firstName ?? user.username ?? t('user.dear'));
 }
 
 /**

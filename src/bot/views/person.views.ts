@@ -10,8 +10,17 @@ function safe(value: string): string {
   return escapeHtml(value);
 }
 
+/**
+ * The year is shown wherever a date is, not just on the confirmation screen:
+ * a user who cannot see it later cannot tell whether the year they typed was
+ * stored correctly.
+ */
+function birthdayWithYear(item: UpcomingBirthday): string {
+  return formatJalali(item.rule.month, item.rule.day, item.rule.year);
+}
+
 export function birthdayDateLine(item: UpcomingBirthday, lang: Language): string {
-  const base = formatJalali(item.rule.month, item.rule.day);
+  const base = birthdayWithYear(item);
   return item.age === null
     ? t('person.birthday', lang, { date: base })
     : t('person.age', lang, { date: base, age: toPersianDigits(item.age) });
@@ -29,7 +38,7 @@ export function upcomingListText(items: UpcomingBirthday[], lang: Language): str
     t('upcoming.item', lang, {
       index: toPersianDigits(index + 1),
       name: safe(truncate(item.person.name, 40)),
-      date: formatJalali(item.rule.month, item.rule.day),
+      date: birthdayWithYear(item),
       countdown: formatDaysUntil(item.daysUntil),
     }),
   );
@@ -67,10 +76,6 @@ export function personDetailsText(item: UpcomingBirthday, lang: Language): strin
   );
 
   return parts.join('\n');
-}
-
-export function personDeleteConfirmText(name: string, lang: Language): string {
-  return t('delete.confirm', lang, { name: safe(name) });
 }
 
 export function personDeletedText(name: string, lang: Language): string {

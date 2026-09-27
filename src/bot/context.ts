@@ -13,6 +13,13 @@ export interface AppState {
   lang: Language;
   /** True when this update is the user's very first contact. */
   isNewUser: boolean;
+  /**
+   * The bot's own last prompt in this chat, when a flow knows it.
+   *
+   * `editOrSend` targets this instead of the incoming message, so answering a
+   * question rewrites the question rather than the user's own text.
+   */
+  promptMessageId?: number;
 }
 
 /**

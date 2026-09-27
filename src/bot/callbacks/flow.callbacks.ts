@@ -3,12 +3,14 @@ import type { AppContext } from '../context.js';
 import { ackCallback, editOrSend, sendText } from '../helpers.js';
 import { interestsKeyboard } from '../keyboards/reminder.js';
 import { interestsText } from '../views/person.views.js';
-import { ValidationError } from '../../shared/errors/index.js';
+import { escapeHtml } from '../../shared/utils/text.js';
 import {
   ADD_PERSON_FLOW,
+  backAddPersonStep,
   completeAddPerson,
   readAddPersonData,
   renderAddPersonConfirmation,
+  skipAddPersonStep,
 } from '../conversations/add-person.js';
 import { startAddInterest } from '../conversations/add-interest.js';
 import { startEditPerson } from '../conversations/edit-person.js';
@@ -36,7 +38,9 @@ export async function handleFlowCallback(
   const userId = ctx.state.user.id;
 
   if (data.kind === 'reminder:pending') {
-    if (data.days === undefined) throw new ValidationError('Missing reminder offset');
+    // `parseCallbackData` guarantees `days` for this kind, so there is nothing
+    // to validate here.
+    const days = data.days as number;
 
     const state = await store.get(userId);
     if (!state || state.flow !== ADD_PERSON_FLOW) {
@@ -46,7 +50,6 @@ export async function handleFlowCallback(
     }
 
     const current = readAddPersonData(state);
-    const days = data.days;
     const selected = current.reminderDays.includes(days)
       ? current.reminderDays.filter((value) => value !== days)
       : [...current.reminderDays, days].sort((a, b) => b - a);
@@ -70,24 +73,46 @@ export async function handleFlowCallback(
     return true;
   }
 
+  // «⏭ بعدی» and «⏮ قبلی» move around inside the add-person flow.
+  if (data.kind === 'flow:person:next' || data.kind === 'flow:person:back') {
+    const state = await store.get(userId);
+    if (!state || state.flow !== ADD_PERSON_FLOW) {
+      await ackCallback(ctx);
+      await sendText(ctx, t('flow.notActive', lang));
+      return true;
+    }
+
+    if (data.kind === 'flow:person:next') {
+      await skipAddPersonStep(ctx, store, state);
+    } else {
+      await backAddPersonStep(ctx, store, state);
+    }
+    return true;
+  }
+
   if (data.kind === 'flow:interest:add') {
-    await startAddInterest(ctx, store, data.personId ?? '');
+    if (!data.personId) return false;
+    // Ownership first, exactly like every other person callback: otherwise a
+    // stale payload would park the user on a prompt for a person they cannot edit.
+    await services.persons.getForUser(ctx.state.user.id, data.personId);
+    await startAddInterest(ctx, store, data.personId);
     return true;
   }
 
   if (data.kind === 'person:edit') {
-    await startEditPerson(ctx, services, store, data.personId ?? '');
+    if (!data.personId) return false;
+    await startEditPerson(ctx, services, store, data.personId);
     return true;
   }
 
   if (data.kind.startsWith('person:edit:')) {
     const field = data.kind.split(':')[2] ?? '';
-    if (!EDIT_FIELDS.has(field)) return false;
+    if (!EDIT_FIELDS.has(field) || !data.personId) return false;
     await startEditPerson(
       ctx,
       services,
       store,
-      data.personId ?? '',
+      data.personId,
       field as 'name' | 'birthday' | 'notes' | 'interests',
     );
     return true;
@@ -113,7 +138,7 @@ export async function handleInterestDelete(
   await ackCallback(ctx);
   await editOrSend(
     ctx,
-    `${t('interests.removed', lang, { title: removed.title })}\n\n${interestsText(person, lang)}`,
+    `${t('interests.removed', lang, { title: escapeHtml(removed.title) })}\n\n${interestsText(person, lang)}`,
     interestsKeyboard(personId, person.interests, lang),
   );
   return true;

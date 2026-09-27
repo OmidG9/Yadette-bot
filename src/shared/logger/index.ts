@@ -34,8 +34,4 @@ export const logger: Logger = pino({
     : {}),
 });
 
-export function createChildLogger(component: string, bindings?: Record<string, unknown>): Logger {
-  return bindings ? logger.child({ component, ...bindings }) : logger.child({ component });
-}
-
 export type AppLogger = Logger;

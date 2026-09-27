@@ -6,6 +6,7 @@ import { ValidationError } from '../../shared/errors/index.js';
 import type { AppContext } from '../context.js';
 import { editOrSend, sendText } from '../helpers.js';
 import { cancelKeyboard } from '../keyboards/reminder.js';
+import { navCallback } from '../callbacks/data.js';
 import { personDetailsKeyboard, personEditKeyboard } from '../keyboards/person.js';
 import { personDetailsText, personEditedText } from '../views/person.views.js';
 import type { Services } from '../../container.js';
@@ -68,7 +69,9 @@ export async function startEditPerson(
           ? t('edit.askNotes', lang)
           : t('edit.askInterests', lang);
 
-  const messageId = await editOrSend(ctx, prompt, cancelKeyboard(personEditBack(personId), lang));
+  // «❌ لغو» has to leave the flow, and `nav:menu` is the only exit that also
+  // clears the stored state — a `person:edit` payload would just come back here.
+  const messageId = await editOrSend(ctx, prompt, cancelKeyboard(navCallback('menu'), lang));
 
   await store.save({
     userId: ctx.state.user.id,
@@ -77,10 +80,6 @@ export async function startEditPerson(
     data: { personId, field, ...(current ? { current } : {}) },
     messageId: messageId ?? null,
   });
-}
-
-function personEditBack(personId: string): string {
-  return `person:edit:${personId}`;
 }
 
 async function showDetails(
@@ -110,7 +109,7 @@ export function createEditPersonFlow(services: Services, store: FlowStore): Flow
   return {
     name: EDIT_PERSON_FLOW,
     initialStep: 'choose',
-    menuSteps: ['choose'],
+    menuSteps: ['choose', 'name', 'birthday', 'notes', 'interests'],
     onCancel: async (ctx, state) => {
       await store.clear(ctx.state.user.id);
       const { personId } = readEditData(state);
@@ -130,7 +129,7 @@ export function createEditPersonFlow(services: Services, store: FlowStore): Flow
         const name = cleanName(text);
 
         if (!name) {
-          await editOrSend(ctx, t('addPerson.invalidName', lang), cancelKeyboard(personEditBack(personId), lang));
+          await editOrSend(ctx, t('addPerson.invalidName', lang), cancelKeyboard(navCallback('menu'), lang));
           return {};
         }
 
@@ -145,7 +144,7 @@ export function createEditPersonFlow(services: Services, store: FlowStore): Flow
         const parsed = parseBirthDate(text);
 
         if (!parsed.ok) {
-          await editOrSend(ctx, t('addPerson.invalidDate', lang), cancelKeyboard(personEditBack(personId), lang));
+          await editOrSend(ctx, t('addPerson.invalidDate', lang), cancelKeyboard(navCallback('menu'), lang));
           return {};
         }
 

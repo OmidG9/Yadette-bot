@@ -1,4 +1,4 @@
-import type { PersonRecord, PersonWithInterests } from '../people/person.types.js';
+import type { PersonRecord } from '../people/person.types.js';
 import type { BirthdayRule } from './birthday.calc.js';
 
 /**
@@ -9,8 +9,4 @@ import type { BirthdayRule } from './birthday.calc.js';
  */
 export function toBirthdayRule(person: Pick<PersonRecord, 'birthMonth' | 'birthDay' | 'birthYear'>): BirthdayRule {
   return { month: person.birthMonth, day: person.birthDay, year: person.birthYear };
-}
-
-export function toBirthdayRules(people: PersonWithInterests[]): BirthdayRule[] {
-  return people.map(toBirthdayRule);
 }

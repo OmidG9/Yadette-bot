@@ -64,6 +64,10 @@ export class BirthdayReminderJob implements ScheduledTask {
     try {
       const user = await users.findById(notification.userId);
       if (!user) {
+        // The claim is released like any other failure: leaving it consumed
+        // would burn this year's reminder for a lookup that may succeed later.
+        await this.releaseClaim(claimed.log.id);
+
         logger.warn(
           { event: 'reminder.user.missing', userId: notification.userId },
           'notification target no longer exists',
@@ -86,12 +90,7 @@ export class BirthdayReminderJob implements ScheduledTask {
       );
     } catch (error) {
       // Release the claim so the next tick retries instead of losing the reminder.
-      await reminders.release(claimed.log.id).catch((releaseError: unknown) => {
-        logger.error(
-          { event: 'reminder.release.failed', err: toError(releaseError) },
-          'could not release notification claim',
-        );
-      });
+      await this.releaseClaim(claimed.log.id);
 
       logger.error(
         {
@@ -104,5 +103,15 @@ export class BirthdayReminderJob implements ScheduledTask {
         'reminder delivery failed',
       );
     }
+  }
+
+  /** Never lets a release failure turn into a second unhandled rejection. */
+  private async releaseClaim(logId: string): Promise<void> {
+    await this.deps.reminders.release(logId).catch((releaseError: unknown) => {
+      logger.error(
+        { event: 'reminder.release.failed', err: toError(releaseError) },
+        'could not release notification claim',
+      );
+    });
   }
 }

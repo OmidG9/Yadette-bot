@@ -1,16 +1,20 @@
-import { ALLOWED_REMINDER_DAYS, DEFAULT_REMINDER_DAYS } from '../../shared/constants/index.js';
+import { ALLOWED_REMINDER_DAYS } from '../../shared/constants/index.js';
 import { NotFoundError, ValidationError } from '../../shared/errors/index.js';
 import { t, type Language } from '../../shared/i18n/index.js';
 import { toPersianDigits } from '../../shared/utils/date.js';
 import {
-  ageOnBirthday,
   resolveDueOccurrence,
   todayFor,
   type BirthdayOccurrence,
   type BirthdayRule,
 } from '../birthdays/birthday.calc.js';
 import type { UserRepository } from '../users/user.types.js';
-import type { NotificationLogRecord, ReminderRecord, ReminderRepository } from './reminder.types.js';
+import { notificationSlotKey } from './reminder.types.js';
+import type {
+  NotificationLogRecord,
+  ReminderRecord,
+  ReminderRepository,
+} from './reminder.types.js';
 
 export interface DueNotification {
   userId: string;
@@ -47,20 +51,38 @@ export class ReminderService {
     private readonly users: UserRepository,
   ) {}
 
-  /** Creates the default reminders (7/3/1/0 days before) if the person has none. */
-  async ensureDefaults(userId: string, personId: string): Promise<ReminderRecord[]> {
-    return this.reminders.ensureForPerson(userId, personId, [...DEFAULT_REMINDER_DAYS]);
-  }
-
+  /**
+   * Every offset the user can toggle, merged with what is actually stored.
+   *
+   * This must not create rows: a person whose reminders the user all switched
+   * off has no rows at all, and materialising the defaults here would silently
+   * undo that choice just because the screen was opened.
+   */
   async listForPerson(userId: string, personId: string): Promise<ReminderRecord[]> {
     const existing = await this.reminders.findForPerson(personId, userId);
-    if (existing.length > 0) return existing;
-    return this.reminders.ensureForPerson(userId, personId, [...DEFAULT_REMINDER_DAYS]);
+    const enabled = new Map(existing.map((reminder) => [reminder.daysBefore, reminder]));
+
+    return ALLOWED_REMINDER_DAYS.map((daysBefore) => {
+      const stored = enabled.get(daysBefore);
+      if (stored) return stored;
+      return {
+        id: '',
+        userId,
+        personId,
+        daysBefore,
+        enabled: false,
+        createdAt: new Date(0),
+        updatedAt: new Date(0),
+      };
+    });
   }
 
   /**
    * Enables/disables one reminder offset for a person.
-   * Unknown-but-allowed offsets are created on demand.
+   *
+   * A person whose reminders were all switched off has no stored rows, so an
+   * offset that is allowed but not present yet is created rather than rejected —
+   * that is the user switching one back on.
    */
   async setEnabled(
     userId: string,
@@ -73,13 +95,20 @@ export class ReminderService {
     }
 
     const existing = await this.reminders.findForPerson(personId, userId);
-    if (existing.length === 0) throw new NotFoundError('Reminder', { personId });
-
     const current = existing.find((reminder) => reminder.daysBefore === daysBefore);
-    if (!current) return existing;
 
-    await this.reminders.setEnabled(current.id, personId, userId, enabled);
-    return this.reminders.findForPerson(personId, userId);
+    // `ensureForPerson` always creates rows enabled, so a freshly created offset
+    // still has to be brought to the state the user asked for.
+    const target =
+      current ??
+      (
+        await this.reminders.ensureForPerson(userId, personId, [daysBefore])
+      )[0];
+
+    if (!target) throw new NotFoundError('Reminder', { personId });
+    await this.reminders.setEnabled(target.id, personId, userId, enabled);
+
+    return this.listForPerson(userId, personId);
   }
 
   async deleteForPerson(personId: string): Promise<number> {
@@ -88,7 +117,11 @@ export class ReminderService {
 
   /**
    * All notifications that are due right now, evaluated in each user's timezone.
-   * Pure business logic: no Telegram, no side effects.
+   *
+   * Occurrences already recorded in the notification log are excluded here, not
+   * in the job: a birthday that is "today" stays due for the whole day, so
+   * without this filter every scheduler tick would keep reporting the same
+   * reminder forever. Pure business logic: no Telegram, no side effects.
    */
   async findDueNotifications(now: Date = new Date()): Promise<DueNotification[]> {
     const users = await this.users.findUsersWithRemindersEnabled();
@@ -96,6 +129,7 @@ export class ReminderService {
 
     for (const user of users) {
       const today = todayFor(user.timezone, now);
+      const sentSlots = await this.reminders.findLogKeys(user.id);
 
       for (const reminder of await this.reminders.findEnabledForUser(user.id)) {
         const rule: BirthdayRule = {
@@ -105,6 +139,14 @@ export class ReminderService {
         };
         const occurrence = resolveDueOccurrence(rule, today, reminder.daysBefore);
         if (!occurrence) continue;
+
+        if (
+          sentSlots.has(
+            notificationSlotKey(reminder.person.id, occurrence.jalaliYear, reminder.daysBefore),
+          )
+        ) {
+          continue;
+        }
 
         due.push({
           userId: user.id,
@@ -149,12 +191,5 @@ export class ReminderService {
   /** Un-claims a slot after a failed delivery so it can be retried. */
   async release(logId: string): Promise<void> {
     await this.reminders.releaseNotification(logId);
-  }
-
-  ageFor(due: DueNotification): number | null {
-    return ageOnBirthday(
-      { month: due.person.birthMonth, day: due.person.birthDay, year: due.person.birthYear },
-      due.occurrence.jalaliYear,
-    );
   }
 }

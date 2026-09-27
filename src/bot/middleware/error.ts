@@ -48,9 +48,12 @@ export function errorHandler(): MiddlewareFn<AppContext> {
         'unhandled error while processing update',
       );
 
-      await ackCallback(ctx);
-
+      // Both the ack and the message have to be inside the guard: a Telegram
+      // outage would otherwise make this handler throw on the way out, and the
+      // user would be left with a spinner and no feedback.
       try {
+        await ackCallback(ctx);
+
         const lang = ctx.state?.lang ?? 'fa';
         const text = error instanceof AppError ? userFacingText(error, lang) : t('errors.generic', lang);
         const chatId = ctx.chat?.id;

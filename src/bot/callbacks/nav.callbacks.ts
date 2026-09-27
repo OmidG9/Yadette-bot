@@ -3,6 +3,7 @@ import { logger } from '../../shared/logger/index.js';
 import type { AppContext } from '../context.js';
 import { ackCallback, editOrSend } from '../helpers.js';
 import { listKeyboard } from '../keyboards/person.js';
+import { welcomeKeyboard } from '../keyboards/start.js';
 import { deleteDataKeyboard, settingsKeyboard, timezoneKeyboard } from '../keyboards/settings.js';
 import {
   dataErasedText,
@@ -10,9 +11,9 @@ import {
   settingsText,
   timezoneListText,
 } from '../views/settings.views.js';
-import { helpText, aboutText } from '../views/menu.views.js';
+import { helpText, aboutText, welcomeText } from '../views/menu.views.js';
 import { upcomingListText } from '../views/person.views.js';
-import { ValidationError, toError } from '../../shared/errors/index.js';
+import { toError } from '../../shared/errors/index.js';
 import { startAddPerson } from '../conversations/add-person.js';
 import { hydrateContext } from '../middleware/hydrate-user.js';
 import type { FlowStore } from '../conversations/flow.store.js';
@@ -33,12 +34,26 @@ export async function handleNavCallback(
   const lang = ctx.state.lang;
 
   switch (target) {
-    // The real list, not an empty one: this is the only way out of the settings
-    // and timezone screens, and it is also where `/cancel` lands.
-    case 'menu':
+    // The real home screen: one button per section, exactly what the
+    // «🏠 منوی اصلی» buttons promise. It used to render the birthday list,
+    // which made that button a no-op — and tapping it twice in a row posted a
+    // duplicate list, because the second edit failed with "not modified" and
+    // fell back to sending a new message.
+    //
+    // It is also the target of the «❌ لغو» button inside a flow and where
+    // `/cancel` lands, so the flow state has to go with it — otherwise the next
+    // message is still eaten as an answer and the user is stuck (§35).
+    case 'menu': {
       await ackCallback(ctx);
-      await showUpcomingList(ctx, services);
+      await flowStore.clear(ctx.state.user.id);
+      const user = ctx.state.user;
+      const peopleCount = await services.persons.countForUser(user.id);
+      const username = ctx.me.username;
+      const text = welcomeText(user, false, peopleCount, lang);
+      const body = username ? text : `${text}\n\n${t('start.ctaFallback', lang)}`;
+      await editOrSend(ctx, body, welcomeKeyboard(username, lang));
       return true;
+    }
 
     // `people` used to be a second, alphabetical list. Inline keyboards in the
     // chat history may still send it, so it maps to the same screen.
@@ -120,8 +135,8 @@ export async function handleSettingsCallback(
     }
 
     case 'settings:tz:set': {
-      if (!data.timezone) throw new ValidationError('Missing timezone');
-      const settings = await services.settings.setTimezone(userId, data.timezone);
+      // `parseCallbackData` guarantees a timezone for this kind.
+      const settings = await services.settings.setTimezone(userId, data.timezone as string);
       await editOrSend(
         ctx,
         settingsText(

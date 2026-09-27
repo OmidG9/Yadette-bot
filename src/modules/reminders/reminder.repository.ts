@@ -1,5 +1,6 @@
 import { Prisma } from '@prisma/client';
 import type { PrismaClient } from '@prisma/client';
+import { notificationSlotKey } from './reminder.types.js';
 import type {
   NotificationLogRecord,
   ReminderRecord,
@@ -110,6 +111,23 @@ export class PrismaReminderRepository implements ReminderRepository {
       where: { userId_personId_birthdayYear_daysBefore: { userId, personId, birthdayYear, daysBefore } },
     });
     return row ? toLogRecord(row) : null;
+  }
+
+  /**
+   * Every notification this user already got, as a lookup set.
+   *
+   * One query per scheduler tick instead of one per due reminder, which matters
+   * because the "already sent" check runs for every enabled reminder of every
+   * user with reminders.
+   */
+  async findLogKeys(userId: string): Promise<Set<string>> {
+    const rows = await this.db.notificationLog.findMany({
+      where: { userId },
+      select: { personId: true, birthdayYear: true, daysBefore: true },
+    });
+    return new Set(
+      rows.map((row) => notificationSlotKey(row.personId, row.birthdayYear, row.daysBefore)),
+    );
   }
 
   async claimNotification(input: {

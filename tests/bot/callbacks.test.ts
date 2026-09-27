@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import {
   addInterestCallback,
+  deleteDataCallback,
   interestDeleteCallback,
   navCallback,
   parseCallbackData,
@@ -74,6 +75,23 @@ describe('callback data round-trip', () => {
   it('parses navigation', () => {
     expect(parseCallbackData(navCallback('people'))).toEqual({ kind: 'nav:people' });
   });
+
+  it('parses the data deletion confirmation, keeping the step in the kind', () => {
+    expect(parseCallbackData(deleteDataCallback('ask'))).toEqual({ kind: 'settings:data:ask' });
+    expect(parseCallbackData(deleteDataCallback('yes'))).toEqual({ kind: 'settings:data:yes' });
+    expect(parseCallbackData(deleteDataCallback('no'))).toEqual({ kind: 'settings:data:no' });
+  });
+
+  /**
+   * Regression: the allow-list was compared against the *whole* kind
+   * (`settings:reminders`) instead of the part after the prefix, so every
+   * settings button was rejected as unknown and the whole screen was dead.
+   */
+  it('parses every settings action', () => {
+    expect(parseCallbackData('settings:reminders')).toEqual({ kind: 'settings:reminders' });
+    expect(parseCallbackData('settings:timezone')).toEqual({ kind: 'settings:timezone' });
+    expect(parseCallbackData('settings:language')).toEqual({ kind: 'settings:language' });
+  });
 });
 
 describe('callback data rejection', () => {
@@ -82,6 +100,10 @@ describe('callback data rejection', () => {
     expect(parseCallbackData('person:view')).toBeNull();
     expect(parseCallbackData('settings:tz:set')).toBeNull();
     expect(parseCallbackData('reminder:pending')).toBeNull();
+    // A confirmation step that is not one of ask/yes/no must never reach a handler.
+    expect(parseCallbackData('settings:data:wipe')).toBeNull();
+    // A bare `settings:data` is the read-only confirmation screen, not a wipe.
+    expect(parseCallbackData('settings:data')).toEqual({ kind: 'settings:data:ask' });
   });
 
   it('rejects oversized or empty payloads', () => {

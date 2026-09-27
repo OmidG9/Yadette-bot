@@ -36,6 +36,18 @@ const PERSON_ACTIONS = [
   'interests',
 ] as const;
 
+/**
+ * The field part of `person:edit:<field>:<personId>`.
+ *
+ * It doubles as the disambiguator: `person:edit` alone carries a person id, and
+ * so does `person:edit:<field>`. Ids are `^[A-Za-z0-9_-]{1,64}$` and none of
+ * these words is a legal id, so the two shapes can never be confused.
+ */
+const EDIT_FIELDS = ['name', 'birthday', 'notes', 'interests'] as const;
+
+/** Prefix of every settings callback; `SETTINGS_ACTIONS` is stored without it. */
+const SETTINGS_PREFIX = 'settings:';
+
 const SETTINGS_ACTIONS = [
   'reminders',
   'timezone',
@@ -50,7 +62,7 @@ function isOneOf<T extends readonly string[]>(value: string, options: T): boolea
   return (options as readonly string[]).includes(value);
 }
 
-/** Turns `action:arg1:arg2` segments into a candidate payload. */
+/** `flow:person:*` — the person is a fixed-length id, so it never appears here. */
 function toCandidate(raw: string): Record<string, unknown> {
   const [head, a, b, c] = raw.split(':');
 
@@ -62,18 +74,25 @@ function toCandidate(raw: string): Record<string, unknown> {
         // person:del:<ask|yes|no>:<personId>
         return { kind: `person:del:${b ?? ''}`, personId: c };
       }
-      if (a === 'edit' && b) {
-        // person:edit:<field>:<personId> — the field is part of the kind.
-        return { kind: `person:edit:${b}`, personId: c };
+      if (a === 'edit') {
+        // person:edit:<personId> | person:edit:<field>:<personId>
+        // — the field is part of the kind when one is given.
+        if (b === undefined) return { kind: 'person:edit' };
+        return isOneOf(b, EDIT_FIELDS)
+          ? { kind: `person:edit:${b}`, personId: c }
+          : { kind: 'person:edit', personId: b };
       }
       // person:<action>:<personId>
       return { kind: `person:${a ?? ''}`, personId: b };
     case 'interest':
       // interest:del:<personId>:<interestId>
       return { kind: 'interest:del', personId: b, interestId: c };
-    case 'flow':
-      // flow:person:save | flow:interest:add:<personId>
-      return { kind: `flow:${a ?? ''}:${b ?? ''}`, personId: c };
+    case 'flow': {
+      // flow:person:save | flow:person:back | flow:person:next
+      // | flow:interest:add:<personId>
+      const kind = a === 'person' ? `flow:person:${b ?? ''}` : `flow:${a ?? ''}:${b ?? ''}`;
+      return { kind, personId: c };
+    }
     case 'reminder':
       // reminder:toggle:<personId>:<days> | reminder:pending:<days>
       return a === 'pending'
@@ -107,10 +126,14 @@ export function parseCallbackData(raw: string | undefined): CallbackData | null 
     (data.kind === 'interest:del' && data.personId !== undefined && data.interestId !== undefined) ||
     (data.kind === 'flow:interest:add' && data.personId !== undefined) ||
     (data.kind === 'flow:person:save') ||
+    (data.kind === 'flow:person:back') ||
+    (data.kind === 'flow:person:next') ||
     (data.kind === 'reminder:toggle' && data.personId !== undefined && data.days !== undefined) ||
     (data.kind === 'reminder:pending' && data.days !== undefined) ||
-    (isOneOf(data.kind, SETTINGS_ACTIONS) && data.kind !== 'settings:tz:set') ||
-    (data.kind === 'settings:tz:set' && data.timezone !== undefined);
+    (data.kind.startsWith(SETTINGS_PREFIX) &&
+      isOneOf(data.kind.slice(SETTINGS_PREFIX.length), SETTINGS_ACTIONS) &&
+      data.kind !== `${SETTINGS_PREFIX}tz:set`) ||
+    (data.kind === `${SETTINGS_PREFIX}tz:set` && data.timezone !== undefined);
 
   return isKnown ? data : null;
 }

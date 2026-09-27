@@ -1,5 +1,6 @@
 import jalaali from 'jalaali-js';
 import { UNKNOWN_BIRTH_YEAR_JALALI } from '../constants/index.js';
+import { t, DEFAULT_LANGUAGE, type Language } from '../i18n/index.js';
 
 export const MS_PER_DAY = 86_400_000;
 
@@ -356,9 +357,15 @@ export function formatJalaliDateOnly(date: Date, options: { withYear?: boolean }
   return formatJalali(jm, jd, options.withYear ? jy : null);
 }
 
-/** `۱۲ روز دیگه` / `فردا` / `امروز` */
-export function formatDaysUntil(days: number): string {
-  if (days <= 0) return 'امروز';
-  if (days === 1) return 'فردا';
-  return `${toPersianDigits(days)} روز دیگه`;
+/**
+ * `۱۲ روز دیگه` / `فردا` / `امروز`
+ *
+ * The copy comes from the dictionary, like every other user-facing string, so
+ * it is translatable. The language is a parameter with a Persian default, which
+ * keeps every existing call site working.
+ */
+export function formatDaysUntil(days: number, lang: Language = DEFAULT_LANGUAGE): string {
+  if (days <= 0) return t('countdown.today', lang);
+  if (days === 1) return t('countdown.tomorrow', lang);
+  return t('countdown.inDays', lang, { count: toPersianDigits(days) });
 }

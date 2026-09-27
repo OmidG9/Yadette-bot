@@ -17,7 +17,11 @@ export function personDetailsKeyboard(
   if (hasInterests) {
     keyboard.text(t('buttons.editInterests', lang), personCallback('interests', personId));
   }
+  // Notes are a first-class field in the copy, so they need a way in and out —
+  // previously a person could be created with notes but never edited or added.
   keyboard
+    .text(t('buttons.editNotes', lang), personCallback('edit:notes', personId))
+    .row()
     .text(t('buttons.editReminders', lang), personCallback('reminders', personId))
     .row()
     .text(t('buttons.delete', lang), personCallback('del:ask', personId))

@@ -1,5 +1,5 @@
 import { InlineKeyboard } from 'grammy';
-import { t, languageDisplayName, type Language } from '../../shared/i18n/index.js';
+import { t, plainText, languageDisplayName, type Language } from '../../shared/i18n/index.js';
 import { deleteDataCallback, navCallback, timezoneCallback } from '../callbacks/data.js';
 import { AVAILABLE_TIMEZONES } from '../../shared/utils/date.js';
 import type { UserSettings } from '../../modules/settings/settings.repository.js';
@@ -13,8 +13,8 @@ export function settingsKeyboard(settings: UserSettings, lang: Language = 'fa'):
   return new InlineKeyboard()
     .text(reminderLabel, 'settings:reminders')
     .row()
-    .text(t('settings.timezoneCurrent', lang, { value: settings.timezone }), 'settings:timezone')
-    .text(t('settings.languageCurrent', lang, { value: languageDisplayName(lang) }), 'settings:language')
+    .text(plainText('settings.timezoneCurrent', lang, { value: settings.timezone }), 'settings:timezone')
+    .text(plainText('settings.languageCurrent', lang, { value: languageDisplayName(lang) }), 'settings:language')
     .row()
     // Destructive action on its own row, deliberately away from the exit button.
     .text(t('settings.dataButton', lang), deleteDataCallback('ask'))

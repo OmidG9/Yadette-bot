@@ -1,10 +1,11 @@
+import { notificationSlotKey } from '../../src/modules/reminders/reminder.types.js';
 import type {
   NotificationLogRecord,
   ReminderRecord,
   ReminderRepository,
   ReminderWithPerson,
 } from '../../src/modules/reminders/reminder.types.js';
-import type { UserRecord, UserRepository } from '../../src/modules/users/user.types.js';
+import type { UserRecord, UserRepository, UpsertTelegramUserInput } from '../../src/modules/users/user.types.js';
 import type { Language } from '../../src/shared/i18n/index.js';
 
 /** In-memory reminder repository with a unique constraint on the notification log. */
@@ -106,6 +107,14 @@ export class FakeReminderRepository implements ReminderRepository {
     );
   }
 
+  async findLogKeys(userId: string): Promise<Set<string>> {
+    return new Set(
+      this.logs
+        .filter((log) => log.userId === userId)
+        .map((log) => notificationSlotKey(log.personId, log.birthdayYear, log.daysBefore)),
+    );
+  }
+
   async claimNotification(input: {
     userId: string;
     personId: string;
@@ -138,6 +147,8 @@ export class FakeReminderRepository implements ReminderRepository {
 }
 
 export class FakeUserRepository implements UserRepository {
+  private sequence = 0;
+
   constructor(private readonly users: UserRecord[]) {}
 
   async findById(id: string): Promise<UserRecord | null> {
@@ -148,8 +159,23 @@ export class FakeUserRepository implements UserRepository {
     return this.users.find((user) => user.telegramId === telegramId) ?? null;
   }
 
-  async create(): Promise<UserRecord> {
-    throw new Error('not used in these tests');
+  async create(input: UpsertTelegramUserInput): Promise<UserRecord> {
+    this.sequence += 1;
+    const user: UserRecord = {
+      id: `generated${this.sequence}`,
+      telegramId: input.telegramId,
+      username: input.username ?? null,
+      firstName: input.firstName ?? null,
+      lastName: input.lastName ?? null,
+      timezone: input.timezone,
+      language: input.language,
+      reminderEnabled: true,
+      lastSeenAt: null,
+      createdAt: new Date(),
+      updatedAt: new Date(),
+    };
+    this.users.push(user);
+    return user;
   }
 
   async updateProfile(): Promise<UserRecord> {

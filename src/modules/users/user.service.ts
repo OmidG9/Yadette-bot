@@ -41,15 +41,6 @@ export class UserService {
     return { user, created: true };
   }
 
-  /** Refreshes the cached Telegram profile fields. Never throws on write failure. */
-  async syncProfile(userId: string, profile: TelegramUserProfile): Promise<void> {
-    await this.users.updateProfile(userId, {
-      username: profile.username ?? null,
-      firstName: profile.firstName ?? null,
-      lastName: profile.lastName ?? null,
-    });
-  }
-
   /** Returns null instead of throwing; used by background jobs. */
   async findById(userId: string): Promise<UserRecord | null> {
     return this.users.findById(userId);
@@ -85,11 +76,6 @@ export class UserService {
    */
   async deleteAccount(userId: string): Promise<void> {
     await this.users.delete(userId);
-  }
-
-  /** Best-effort display name for greetings. */
-  displayName(user: UserRecord): string {
-    return user.firstName?.trim() || user.username?.trim() || 'دوست عزیز';
   }
 
   private assertTelegramId(telegramId: string): void {

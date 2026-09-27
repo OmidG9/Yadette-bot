@@ -1,6 +1,7 @@
 ﻿import type { MiddlewareFn } from 'grammy';
 import type { AppContext } from '../context.js';
 import { t } from '../../shared/i18n/index.js';
+import type { Language } from '../../shared/i18n/index.js';
 import { sendText } from '../helpers.js';
 import { mainMenuLabels } from '../keyboards/main.js';
 import { logger } from '../../shared/logger/index.js';
@@ -38,7 +39,16 @@ export interface FlowDefinition {
   onFinish?: (ctx: AppContext, state: FlowState) => Promise<void>;
 }
 
-const CANCEL_TEXTS = new Set(['❌ لغو', '/cancel@yadette_bot', 'لغو', 'cancel', '/cancel']);
+/**
+ * Ways out of a flow (§35).
+ *
+ * The visible label is the dictionary's, so the button and this check can never
+ * drift apart. The remaining entries are the spellings a user is likely to type
+ * instead of tapping, and are kept next to the label on purpose.
+ */
+function cancelTexts(lang: Language): string[] {
+  return [t('common.cancel', lang), t('flow.cancelWord', lang), 'cancel', '/cancel'];
+}
 
 /**
  * Conversation middleware.
@@ -56,6 +66,15 @@ export function createFlowMiddleware(
   return async (ctx, next) => {
     const text = ctx.message?.text;
     if (!text) {
+      await next();
+      return;
+    }
+
+    // A command is never an answer. This middleware is installed before the
+    // command handlers, so without this guard `/start` would be read as the
+    // answer to whatever question is open — and `cleanName('/start')` passes,
+    // which would name the person `/start`.
+    if (text.startsWith('/')) {
       await next();
       return;
     }
@@ -79,8 +98,11 @@ export function createFlowMiddleware(
     }
 
     const lang = ctx.state.lang;
+    // The prompt the user is answering, so the next step rewrites that message
+    // instead of the text they just typed.
+    ctx.state.promptMessageId = state.messageId ?? undefined;
 
-    if (CANCEL_TEXTS.has(text.trim())) {
+    if (cancelTexts(lang).includes(text.trim())) {
       await store.clear(ctx.state.user.id);
       // `onCancel` owns the reply, so a flow can show a useful keyboard again.
       if (flow.onCancel) {

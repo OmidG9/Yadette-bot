@@ -1,6 +1,6 @@
 import { t } from '../../shared/i18n/index.js';
 import type { AppContext } from '../context.js';
-import { editOrSend } from '../helpers.js';
+import { editOrSend, sendText } from '../helpers.js';
 import { personDetailsKeyboard } from '../keyboards/person.js';
 import { confirmKeyboard, interestsKeyboard, reminderKeyboard } from '../keyboards/reminder.js';
 import { reminderSettingsText } from '../views/reminder.views.js';
@@ -11,9 +11,12 @@ import {
 } from '../views/person.views.js';
 import { escapeHtml } from '../../shared/utils/text.js';
 import type { Services } from '../../container.js';
+import type { FlowStore } from '../conversations/flow.store.js';
 
 export interface PersonCallbackDeps {
   services: Services;
+  /** Needed to drop flow state when a cancel button lands on a person screen. */
+  flowStore?: FlowStore;
   /** Back navigation target: the single birthday list. */
   showUpcomingList: (ctx: AppContext) => Promise<void>;
 }
@@ -48,7 +51,10 @@ export async function handlePersonCallback(
     case 'person:del:yes': {
       const person = await services.persons.delete(userId, personId);
       await services.reminders.deleteForPerson(person.id);
-      await editOrSend(ctx, personDeletedText(person.name, lang));
+      await deps.flowStore?.clear(userId);
+      // Sent, not edited: `showUpcomingList` edits this same message, which would
+      // wipe the confirmation of an irreversible action before it can be read.
+      await sendText(ctx, personDeletedText(person.name, lang));
       await deps.showUpcomingList(ctx);
       return true;
     }
@@ -71,6 +77,10 @@ export async function handlePersonCallback(
 
     case 'person:interests': {
       const person = await services.persons.getForUser(userId, personId);
+      // This is also the cancel target of the add-interest prompt, so the flow
+      // has to go with it: leaving it behind would save the user's next message
+      // as an interest.
+      await deps.flowStore?.clear(userId);
       await editOrSend(
         ctx,
         interestsText(person, lang),
@@ -92,8 +102,4 @@ export async function handlePersonCallback(
       personDetailsKeyboard(person.id, context.state.lang, person.interests.length > 0),
     );
   }
-}
-
-export function isPersonCallback(kind: string): boolean {
-  return kind.startsWith('person:');
 }

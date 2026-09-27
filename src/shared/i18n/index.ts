@@ -48,3 +48,13 @@ export function isSupportedLanguage(value: string): value is Language {
 export function languageDisplayName(lang: Language): string {
   return lang === 'fa' ? 'فارسی' : lang;
 }
+
+/**
+ * Same copy with the formatting tags removed, for inline-button labels.
+ *
+ * The Bot API never HTML-parses `callback_data` button text, so a label taken
+ * straight from a message template shows the user literal `<b>` characters.
+ */
+export function plainText(key: TranslationKey, lang?: Language, params?: TranslationParams): string {
+  return t(key, lang, params).replace(/<\/?[a-z][^>]*>/gi, '');
+}

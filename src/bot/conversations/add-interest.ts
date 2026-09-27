@@ -1,5 +1,6 @@
 import { z } from 'zod';
 import { t } from '../../shared/i18n/index.js';
+import { escapeHtml } from '../../shared/utils/text.js';
 import { ValidationError } from '../../shared/errors/index.js';
 import type { AppContext } from '../context.js';
 import { editOrSend } from '../helpers.js';
@@ -49,7 +50,7 @@ export function createAddInterestFlow(services: Services, store: FlowStore): Flo
         await store.clear(ctx.state.user.id);
         await editOrSend(
           ctx,
-          `${t('interests.added', lang, { title: added.join('، ') })}\n\n${interestsText(person, lang)}`,
+          `${t('interests.added', lang, { title: added.map(escapeHtml).join('، ') })}\n\n${interestsText(person, lang)}`,
           interestsKeyboard(personId, person.interests, lang),
         );
         return { next: null };

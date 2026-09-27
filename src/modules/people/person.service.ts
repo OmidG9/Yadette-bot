@@ -6,7 +6,6 @@ import type {
   InterestRecord,
   PersonRecord,
   PersonRepository,
-  PersonWithInterests,
   PersonWithReminders,
 } from './person.types.js';
 
@@ -79,10 +78,6 @@ export class PersonService {
   }
 
   async listForUser(userId: string): Promise<PersonWithReminders[]> {
-    return this.people.findAllForUser(userId);
-  }
-
-  async listWithInterestsForUser(userId: string): Promise<PersonWithInterests[]> {
     return this.people.findAllForUser(userId);
   }
 

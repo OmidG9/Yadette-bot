@@ -1,12 +1,15 @@
 import { z } from 'zod';
 import { t } from '../../shared/i18n/index.js';
+import type { Language } from '../../shared/i18n/index.js';
 import { cleanName, cleanNotes, parseInterests } from '../../shared/utils/text.js';
-import { parseBirthDate } from '../../shared/utils/date.js';
+import { parseBirthDate, toPersianDigits } from '../../shared/utils/date.js';
 import { ValidationError } from '../../shared/errors/index.js';
+import { escapeHtml } from '../../shared/utils/text.js';
 import { DEFAULT_REMINDER_DAYS } from '../../shared/constants/index.js';
 import type { AppContext } from '../context.js';
-import { editOrSend, sendText, showMainMenu } from '../helpers.js';
-import { cancelKeyboard, pendingReminderKeyboard } from '../keyboards/reminder.js';
+import type { InlineKeyboard } from 'grammy';
+import { ackCallback, editOrSend, sendText, showMainMenu } from '../helpers.js';
+import { flowNavKeyboard, pendingReminderKeyboard } from '../keyboards/reminder.js';
 import { personDetailsKeyboard } from '../keyboards/person.js';
 import {
   addPersonConfirmationText,
@@ -32,16 +35,29 @@ export type AddPersonData = z.infer<typeof dataSchema>;
 const SKIP = '-';
 export const ADD_PERSON_FLOW = 'add-person';
 
+/** The questions the user walks through, in order. */
+const STEPS = ['name', 'birthday', 'interests', 'notes', 'reminders'] as const;
+type Step = (typeof STEPS)[number];
+
+/** Where «⏮ قبلی» goes, and what «⏭ بعدی» may skip. */
+const STEP_NAV: Record<Step, { back?: Step; skippable: boolean }> = {
+  name: { skippable: false },
+  birthday: { back: 'name', skippable: false },
+  interests: { back: 'birthday', skippable: true },
+  notes: { back: 'interests', skippable: true },
+  reminders: { back: 'notes', skippable: false },
+};
+
+/** Value each step stores when the user taps «⏭ بعدی». */
+const STEP_SKIP_DATA: Partial<Record<Step, Record<string, unknown>>> = {
+  interests: { interests: [] },
+  notes: { notes: null },
+};
+
 export function readAddPersonData(state: FlowState): AddPersonData {
   const parsed = dataSchema.safeParse(state.data);
   if (!parsed.success) throw new ValidationError('Corrupt add-person flow state');
   return parsed.data;
-}
-
-/** Reads the name typed in an earlier step (flow data is persisted per step). */
-function readName(state: FlowState): string {
-  const name = state.data['name'];
-  return typeof name === 'string' ? name : '';
 }
 
 /** Merges whatever the flow has collected so far with defaults. */
@@ -60,6 +76,143 @@ function initialData(): AddPersonData {
     interests: [],
     reminderDays: [...DEFAULT_REMINDER_DAYS],
   };
+}
+
+/**
+ * The prompt of a step, rebuilt from whatever has been collected so far.
+ *
+ * Kept separate from the step handlers on purpose: «⏮ قبلی» has to re-ask a
+ * question that was already answered, and it has no way to replay the handler
+ * that asked it.
+ */
+export function stepPrompt(step: Step, data: AddPersonData, lang: Language): string {
+  // The name reaches the message as HTML, so it has to be escaped like any view.
+  const name = escapeHtml(data.name);
+  const current = (value: string | null | undefined): string =>
+    value ? t('addPerson.currentAnswer', lang, { value: escapeHtml(value) }) : '';
+
+  switch (step) {
+    case 'name':
+      return `${t('addPerson.askName', lang)}\n\n${progress(step, lang)}\n\n${t('hint.cancel', lang)}`;
+    case 'birthday':
+      return `${t('addPerson.askBirthday', lang, { name })}\n\n${progress(step, lang)}`;
+    case 'interests':
+      return `${t('addPerson.askInterests', lang, { name, current: current(data.interests.join('، ')) })}\n\n${progress(step, lang)}\n\n${t('hint.skip', lang)}`;
+    case 'notes':
+      return `${t('addPerson.askNotes', lang, { name, current: current(data.notes) })}\n\n${progress(step, lang)}\n\n${t('hint.skip', lang)}`;
+    case 'reminders':
+      return t('addPerson.confirmation', lang, { name });
+  }
+}
+
+/** `📋 مرحله ۲ از ۵` — reassurance that the flow ends. */
+function progress(step: Step, lang: Language): string {
+  return t('addPerson.progress', lang, {
+    current: toPersianDigits(STEPS.indexOf(step) + 1),
+    total: toPersianDigits(STEPS.length),
+  });
+}
+
+/** The buttons that make sense on a step: skip, back, and always cancel. */
+function stepKeyboard(step: Step, lang: Language): InlineKeyboard {
+  const nav = STEP_NAV[step];
+  return flowNavKeyboard({ canSkip: nav.skippable, canGoBack: nav.back !== undefined }, lang);
+}
+
+/**
+ * Renders a step without touching the store.
+ *
+ * The flow middleware owns persistence: a handler returns `{ next, data,
+ * messageId }` and the middleware writes the state once. The callback entry
+ * points (`⏭ بعدی`, `⏮ قبلی`) are not driven by the middleware, so they save the
+ * state themselves — see `persistStep`.
+ *
+ * The confirmation step is the exception: it is driven by inline buttons rather
+ * than by a question, so it has its own renderer. Routing both entry points
+ * through here is what keeps «⏭ بعدی» from landing on a screen that has the
+ * confirmation text but none of the buttons that can act on it.
+ */
+async function renderStep(
+  ctx: AppContext,
+  step: Step,
+  data: AddPersonData,
+): Promise<number | undefined> {
+  const lang = ctx.state.lang;
+  return step === 'reminders'
+    ? renderAddPersonConfirmation(ctx, data)
+    : editOrSend(ctx, stepPrompt(step, data, lang), stepKeyboard(step, lang));
+}
+
+/** Renders a step and records it, for the callback paths the middleware misses. */
+async function showStep(
+  ctx: AppContext,
+  step: Step,
+  data: AddPersonData,
+  store: FlowStore,
+): Promise<number | undefined> {
+  const messageId = await renderStep(ctx, step, data);
+  await persistStep(ctx, step, data, store, messageId);
+  return messageId;
+}
+
+async function persistStep(
+  ctx: AppContext,
+  step: Step,
+  data: AddPersonData,
+  store: FlowStore,
+  messageId: number | undefined,
+): Promise<void> {
+  await store.save({
+    userId: ctx.state.user.id,
+    flow: ADD_PERSON_FLOW,
+    step,
+    data,
+    messageId: messageId ?? null,
+  });
+}
+
+/** «⏭ بعدی»: skips an optional step and moves on. */
+export async function skipAddPersonStep(
+  ctx: AppContext,
+  store: FlowStore,
+  state: FlowState,
+): Promise<void> {
+  await ackCallback(ctx);
+
+  const lang = ctx.state.lang;
+  const step = state.step as Step;
+  const next = STEPS.indexOf(step) >= 0 ? STEPS[STEPS.indexOf(step) + 1] : undefined;
+
+  if (!STEP_NAV[step]?.skippable || !next) {
+    await sendText(ctx, t('flow.busy', lang));
+    return;
+  }
+
+  const data: AddPersonData = {
+    ...initialData(),
+    ...partialData(state),
+    ...(STEP_SKIP_DATA[step] ?? {}),
+  };
+
+  await showStep(ctx, next, data, store);
+}
+
+/** «⏮ قبلی»: re-asks the previous question, keeping what was already typed. */
+export async function backAddPersonStep(
+  ctx: AppContext,
+  store: FlowStore,
+  state: FlowState,
+): Promise<void> {
+  await ackCallback(ctx);
+
+  const target = STEP_NAV[state.step as Step]?.back;
+
+  if (!target) {
+    await sendText(ctx, t('flow.busy', ctx.state.lang));
+    return;
+  }
+
+  await showStep(ctx, target, readAddPersonData(state), store);
 }
 
 /** Confirmation screen: reminder toggles + save/cancel. */
@@ -106,19 +259,8 @@ export async function completeAddPerson(
 
 /** Entry point for the `➕ افزودن شخص` button. */
 export async function startAddPerson(ctx: AppContext, store: FlowStore): Promise<void> {
-  const lang = ctx.state.lang;
-  await store.save({
-    userId: ctx.state.user.id,
-    flow: ADD_PERSON_FLOW,
-    step: 'name',
-    data: { ...initialData() },
-    messageId: null,
-  });
-  await sendText(
-    ctx,
-    `${t('addPerson.askName', lang)}\n\n${t('hint.cancel', lang)}`,
-    cancelKeyboard('nav:menu', lang),
-  );
+  const data = initialData();
+  await showStep(ctx, 'name', data, store);
 
   // Arriving straight from the `?start=add` deep link means no welcome message
   // was sent, so the reply keyboard still has to be installed once.
@@ -148,70 +290,67 @@ export function createAddPersonFlow(store: FlowStore): FlowDefinition {
         const name = cleanName(text);
 
         if (!name) {
-          await editOrSend(ctx, t('addPerson.invalidName', lang), cancelKeyboard('nav:menu', lang));
+          await editOrSend(ctx, t('addPerson.invalidName', lang), stepKeyboard('name', lang));
           return {};
         }
 
-        const messageId = await editOrSend(
-          ctx,
-          t('addPerson.askBirthday', lang, { name }),
-          cancelKeyboard('nav:menu', lang),
-        );
-
-        return { next: 'birthday', data: { name }, messageId };
+        const data: AddPersonData = { ...initialData(), name };
+        return { next: 'birthday', data, messageId: await renderStep(ctx, 'birthday', data) };
       },
 
       birthday: async (ctx, state, text) => {
         const lang = ctx.state.lang;
         const parsed = parseBirthDate(text);
-        const name = readName(state);
 
         if (!parsed.ok) {
-          await editOrSend(ctx, t('addPerson.invalidDate', lang), cancelKeyboard('nav:menu', lang));
+          await editOrSend(ctx, t('addPerson.invalidDate', lang), stepKeyboard('birthday', lang));
           return {};
         }
 
-        const messageId = await editOrSend(
-          ctx,
-          `${t('addPerson.askInterests', lang, { name })}\n\n${t('hint.skip', lang)}`,
-          cancelKeyboard('nav:menu', lang),
-        );
+        const data: AddPersonData = {
+          ...initialData(),
+          ...partialData(state),
+          month: parsed.month,
+          day: parsed.day,
+          year: parsed.year,
+        };
 
         return {
           next: 'interests',
-          data: { month: parsed.month, day: parsed.day, year: parsed.year },
-          messageId,
+          data,
+          messageId: await renderStep(ctx, 'interests', data),
         };
       },
 
       interests: async (ctx, state, text) => {
-        const lang = ctx.state.lang;
-        const interests = text.trim() === SKIP ? [] : parseInterests(text);
-        const name = readName(state);
+        const data: AddPersonData = {
+          ...initialData(),
+          ...partialData(state),
+          interests: text.trim() === SKIP ? [] : parseInterests(text),
+        };
 
-        const messageId = await editOrSend(
-          ctx,
-          `${t('addPerson.askNotes', lang, { name })}\n\n${t('hint.skip', lang)}`,
-          cancelKeyboard('nav:menu', lang),
-        );
-
-        return { next: 'notes', data: { interests }, messageId };
+        return { next: 'notes', data, messageId: await renderStep(ctx, 'notes', data) };
       },
 
       notes: async (ctx, state, text) => {
-        const notes = text.trim() === SKIP ? null : cleanNotes(text);
-        const data: AddPersonData = { ...initialData(), ...partialData(state), notes };
+        const data: AddPersonData = {
+          ...initialData(),
+          ...partialData(state),
+          notes: text.trim() === SKIP ? null : cleanNotes(text),
+        };
 
-        const messageId = await renderAddPersonConfirmation(ctx, data);
-        return { next: 'reminders', data: { notes }, messageId };
+        return {
+          next: 'reminders',
+          data,
+          messageId: await renderStep(ctx, 'reminders', data),
+        };
       },
 
       reminders: async (ctx, state) => {
         // Text input is ignored here: the inline buttons drive this step.
-        const data = readAddPersonData(state);
-        const messageId = await renderAddPersonConfirmation(ctx, data);
-        return { messageId };
+        return { messageId: await renderStep(ctx, 'reminders', readAddPersonData(state)) };
       },
     },
   };
 }
+

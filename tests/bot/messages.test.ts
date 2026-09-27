@@ -27,19 +27,27 @@ function leaves(value: unknown, path: string[] = []): { path: string; text: stri
 
 const allCopy = leaves(fa);
 
+/** The only tags the copy is allowed to use. Anything else risks leaking raw. */
+const ALLOWED_TAGS = ['<b>', '</b>', '<i>', '</i>', '<code>', '</code>'];
+
 describe('copy safety', () => {
-  it('only ever uses <b> as markup, so nothing can leak as a raw tag', () => {
+  it('only ever uses allowed markup, so nothing can leak as a raw tag', () => {
     for (const { path, text } of allCopy) {
-      const withoutBold = text.replaceAll('<b>', '').replaceAll('</b>', '');
-      expect(withoutBold, `${path} contains markup other than <b>`).not.toMatch(/[<>]/);
+      let stripped = text;
+      for (const tag of ALLOWED_TAGS) stripped = stripped.replaceAll(tag, '');
+      expect(stripped, `${path} contains markup outside ${ALLOWED_TAGS.join(' ')}`).not.toMatch(
+        /[<>]/,
+      );
     }
   });
 
-  it('balances every <b> in the copy', () => {
+  it('balances every tag in the copy', () => {
     for (const { path, text } of allCopy) {
-      const open = text.split('<b>').length - 1;
-      const close = text.split('</b>').length - 1;
-      expect(open, `${path} has unbalanced <b>`).toBe(close);
+      for (const tag of ['b', 'i', 'code']) {
+        const open = text.split(`<${tag}>`).length - 1;
+        const close = text.split(`</${tag}>`).length - 1;
+        expect(open, `${path} has unbalanced <${tag}>`).toBe(close);
+      }
     }
   });
 

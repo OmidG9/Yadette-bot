@@ -4,6 +4,8 @@ import { ackCallback, editOrSend, sendText } from '../helpers.js';
 import { interestsKeyboard } from '../keyboards/reminder.js';
 import { interestsText } from '../views/person.views.js';
 import { escapeHtml } from '../../shared/utils/text.js';
+import { ALLOWED_REMINDER_DAYS } from '../../shared/constants/index.js';
+import { ValidationError } from '../../shared/errors/index.js';
 import {
   ADD_PERSON_FLOW,
   backAddPersonStep,
@@ -38,9 +40,13 @@ export async function handleFlowCallback(
   const userId = ctx.state.user.id;
 
   if (data.kind === 'reminder:pending') {
-    // `parseCallbackData` guarantees `days` for this kind, so there is nothing
-    // to validate here.
     const days = data.days as number;
+
+    // Callback data is attacker controlled: a stale or hand-crafted payload must
+    // not be able to park an unsupported offset in the flow state.
+    if (!(ALLOWED_REMINDER_DAYS as readonly number[]).includes(days)) {
+      throw new ValidationError('Unsupported reminder offset', { days });
+    }
 
     const state = await store.get(userId);
     if (!state || state.flow !== ADD_PERSON_FLOW) {

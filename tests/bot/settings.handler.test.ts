@@ -38,7 +38,11 @@ interface Message {
   keyboard: { inline_keyboard: { text: string; callback_data?: string }[][] } | undefined;
 }
 
-function ctxFor(user: UserRecord = fakeUser()) {
+function ctxFor(user: UserRecord = fakeUser()): {
+  ctx: AppContext;
+  edited: Message[];
+  sent: Message[];
+} {
   const edited: Message[] = [];
   const sent: Message[] = [];
 
@@ -142,7 +146,17 @@ describe('the exit button of the settings screen', () => {
 });
 
 describe('settings:data', () => {
-  function deletionDeps(freshUser: UserRecord) {
+  function deletionDeps(freshUser: UserRecord): {
+    deleted: string[];
+    touched: string[];
+    services: {
+      users: {
+        deleteAccount: (id: string) => Promise<void>;
+        getOrCreate: () => Promise<{ user: UserRecord; created: boolean }>;
+        markSeen: (id: string) => Promise<void>;
+      };
+    };
+  } {
     const deleted: string[] = [];
     const touched: string[] = [];
 

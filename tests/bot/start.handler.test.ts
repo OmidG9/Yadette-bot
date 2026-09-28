@@ -5,7 +5,14 @@ import type { AppContext } from '../../src/bot/context.js';
 import { fakeUser } from '../helpers/fakes.js';
 import type { UserRecord } from '../../src/modules/users/user.types.js';
 
-function ctxFor(user: UserRecord, isNewUser: boolean, match?: string) {
+function ctxFor(
+  user: UserRecord,
+  isNewUser: boolean,
+  match?: string,
+): {
+  ctx: AppContext;
+  sent: { text: string; extra?: Record<string, unknown> }[];
+} {
   const sent: { text: string; extra?: Record<string, unknown> }[] = [];
   const ctx = {
     state: { lang: 'fa', user, isNewUser },
@@ -20,7 +27,7 @@ function ctxFor(user: UserRecord, isNewUser: boolean, match?: string) {
   return { ctx: ctx as unknown as AppContext, sent };
 }
 
-function deps(peopleCount: number) {
+function deps(peopleCount: number): never {
   return {
     services: { persons: { countForUser: async () => peopleCount } },
     flowStore: { save: async () => undefined, clear: async () => undefined },

@@ -102,11 +102,6 @@ export function resolveDueOccurrence(
   return null;
 }
 
-/** Reminder moment (Jalali date) for an occurrence. */
-export function reminderDateFor(occurrence: BirthdayOccurrence, daysBefore: number): JalaliDate {
-  return subtractJalaliDays(occurrence.jalali, daysBefore);
-}
-
 /** Age in years, based on Jalali years. */
 export function ageOnBirthday(rule: BirthdayRule, occurrenceJalaliYear: number): number | null {
   if (rule.year === null) return null;

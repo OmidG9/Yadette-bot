@@ -21,7 +21,11 @@ function dueFor(due: DueNotification): DueNotification {
   return due;
 }
 
-function makeJob(users: { telegramId: string }[] | null) {
+function makeJob(users: { telegramId: string }[] | null): {
+  job: BirthdayReminderJob;
+  service: ReminderService;
+  sent: { chatId: string; text: string }[];
+} {
   const reminders = new FakeReminderRepository();
   reminders.seed(person);
   const userRepo = new FakeUserRepository([fakeUser()]);

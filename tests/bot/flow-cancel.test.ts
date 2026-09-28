@@ -9,7 +9,12 @@ import { fakeUser } from '../helpers/fakes.js';
 
 const personId = 'clx1234567890abcdefghijklm';
 
-function fakeStore(initial: FlowState | null = null) {
+function fakeStore(initial: FlowState | null = null): {
+  get: () => Promise<FlowState | null>;
+  save: (next: FlowState) => Promise<void>;
+  clear: () => Promise<void>;
+  peek: () => FlowState | null;
+} {
   let current = initial;
   return {
     get: async () => current,

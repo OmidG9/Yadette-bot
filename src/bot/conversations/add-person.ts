@@ -5,7 +5,7 @@ import { cleanName, cleanNotes, parseInterests } from '../../shared/utils/text.j
 import { parseBirthDate, toPersianDigits } from '../../shared/utils/date.js';
 import { ValidationError } from '../../shared/errors/index.js';
 import { escapeHtml } from '../../shared/utils/text.js';
-import { DEFAULT_REMINDER_DAYS } from '../../shared/constants/index.js';
+import { ALLOWED_REMINDER_DAYS, DEFAULT_REMINDER_DAYS } from '../../shared/constants/index.js';
 import type { AppContext } from '../context.js';
 import type { InlineKeyboard } from 'grammy';
 import { ackCallback, editOrSend, sendText, showMainMenu } from '../helpers.js';
@@ -27,7 +27,17 @@ const dataSchema = z.object({
   year: z.number().int().nullable(),
   notes: z.string().nullable(),
   interests: z.array(z.string()),
-  reminderDays: z.array(z.number().int()),
+  /**
+   * Restricted to the offsets the product offers. Callback data is attacker
+   * controlled, so without this an unknown offset could be parked in the flow
+   * state and later written onto the person record as a reminder.
+   */
+  reminderDays: z
+    .array(z.number().int())
+    .refine(
+      (days) => days.every((day) => (ALLOWED_REMINDER_DAYS as readonly number[]).includes(day)),
+      { message: 'unsupported reminder offset' },
+    ),
 });
 
 export type AddPersonData = z.infer<typeof dataSchema>;

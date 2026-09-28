@@ -137,6 +137,99 @@ describe('ReminderService.findDueNotifications', () => {
   });
 });
 
+describe('ReminderService.setEnabled', () => {
+  let reminders: FakeReminderRepository;
+  let service: ReminderService;
+
+  beforeEach(() => {
+    reminders = new FakeReminderRepository();
+    const users = new FakeUserRepository([fakeUser()]);
+    reminders.seed(person);
+    service = new ReminderService(reminders, users);
+  });
+
+  it('turns on an offset the person does not have yet', async () => {
+    const before = await service.listForPerson('user1', person.id);
+    expect(before.find((r) => r.daysBefore === 14)?.enabled).toBe(false);
+
+    await service.setEnabled('user1', person.id, 14, true);
+
+    const after = await service.listForPerson('user1', person.id);
+    expect(after.find((r) => r.daysBefore === 14)?.enabled).toBe(true);
+  });
+
+  /**
+   * Regression: `ensureForPerson` returns *all* of the person's rows ordered by
+   * offset descending, and the code took the first one. Turning on "14 days
+   * before" for someone who already had 30/7/1/0 therefore rewrote the 30-day
+   * reminder instead — a silent data change the user never asked for.
+   */
+  it('never touches a different offset when creating a missing one', async () => {
+    const before = await reminders.findForPerson(person.id, 'user1');
+    const others = before
+      .filter((r) => r.daysBefore !== 14)
+      .map((r) => ({ daysBefore: r.daysBefore, enabled: r.enabled }));
+
+    expect(others.length).toBeGreaterThan(0);
+
+    await service.setEnabled('user1', person.id, 14, true);
+
+    const after = await reminders.findForPerson(person.id, 'user1');
+    for (const other of others) {
+      expect(
+        after.find((r) => r.daysBefore === other.daysBefore)?.enabled,
+        `offset ${other.daysBefore} must not change`,
+      ).toBe(other.enabled);
+    }
+    expect(after.find((r) => r.daysBefore === 14)?.enabled).toBe(true);
+  });
+
+  it('creates a missing offset already in the requested state', async () => {
+    // `ensureForPerson` always inserts enabled rows, so an "off" request has to
+    // be applied to the freshly created row.
+    await service.setEnabled('user1', person.id, 30, false);
+
+    const after = await reminders.findForPerson(person.id, 'user1');
+    expect(after.find((r) => r.daysBefore === 30)?.enabled).toBe(false);
+  });
+
+  it('rejects an offset the product does not offer', async () => {
+    await expect(service.setEnabled('user1', person.id, 99, true)).rejects.toThrow(ValidationError);
+  });
+
+  it('re-enables only the requested offset when all of them are off', async () => {
+    for (const days of [0, 1, 3, 7]) {
+      await service.setEnabled('user1', person.id, days, false);
+    }
+    expect((await reminders.findForPerson(person.id, 'user1')).every((r) => !r.enabled)).toBe(true);
+
+    await service.setEnabled('user1', person.id, 3, true);
+
+    const rows = await reminders.findForPerson(person.id, 'user1');
+    expect(rows.find((r) => r.daysBefore === 3)?.enabled).toBe(true);
+    for (const days of [0, 1, 7]) {
+      expect(rows.find((r) => r.daysBefore === days)?.enabled, `offset ${days}`).toBe(false);
+    }
+  });
+
+  it('works for a person whose reminder rows were deleted outright', async () => {
+    const empty = new FakeReminderRepository();
+    const users = new FakeUserRepository([fakeUser()]);
+    empty.seed({ ...person, id: 'person2' });
+    const svc = new ReminderService(empty, users);
+
+    await empty.deleteForPerson('person2');
+    expect(await empty.findForPerson('person2', 'user1')).toHaveLength(0);
+
+    await svc.setEnabled('user1', 'person2', 3, true);
+
+    const rows = await empty.findForPerson('person2', 'user1');
+    expect(rows).toHaveLength(1);
+    expect(rows[0]?.daysBefore).toBe(3);
+    expect(rows[0]?.enabled).toBe(true);
+  });
+});
+
 describe('ReminderService notification claims', () => {
   let reminders: FakeReminderRepository;
   let service: ReminderService;

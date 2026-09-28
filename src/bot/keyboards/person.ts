@@ -1,6 +1,6 @@
 import { InlineKeyboard } from 'grammy';
 import { t, type Language } from '../../shared/i18n/index.js';
-import { personCallback } from '../callbacks/data.js';
+import { navCallback, personCallback } from '../callbacks/data.js';
 import type { UpcomingBirthday } from '../../modules/birthdays/birthday.types.js';
 
 /** Buttons of the person details screen (§16). */
@@ -25,7 +25,7 @@ export function personDetailsKeyboard(
     .text(t('buttons.editReminders', lang), personCallback('reminders', personId))
     .row()
     .text(t('buttons.delete', lang), personCallback('del:ask', personId))
-    .text(t('buttons.back', lang), 'nav:upcoming');
+    .text(t('buttons.back', lang), navCallback('upcoming'));
 
   return keyboard;
 }
@@ -55,5 +55,5 @@ export function listKeyboard(items: UpcomingBirthday[]): InlineKeyboard {
     keyboard.row();
   }
 
-  return keyboard.text(t('buttons.home'), 'nav:menu');
+  return keyboard.text(t('buttons.home'), navCallback('menu'));
 }

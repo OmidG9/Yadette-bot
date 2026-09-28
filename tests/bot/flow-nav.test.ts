@@ -3,6 +3,7 @@ import { handleNavCallback } from '../../src/bot/callbacks/nav.callbacks.js';
 import { handleFlowCallback } from '../../src/bot/callbacks/flow.callbacks.js';
 import { parseCallbackData } from '../../src/bot/callbacks/data.js';
 import { flowNavKeyboard } from '../../src/bot/keyboards/reminder.js';
+import { ValidationError } from '../../src/shared/errors/index.js';
 import { startAddPerson, createAddPersonFlow, readAddPersonData } from '../../src/bot/conversations/add-person.js';
 import type { AppContext } from '../../src/bot/context.js';
 import type { FlowState } from '../../src/bot/conversations/flow.store.js';
@@ -153,6 +154,47 @@ describe('flow navigation buttons', () => {
         }
       }
     }
+  });
+});
+
+describe('reminder selection inside the add-person flow', () => {
+  it('toggles an offered offset on and off again', async () => {
+    const store = fakeStore(stateAt('reminders', { reminderDays: [7, 3, 1, 0] }));
+    const { ctx } = fakeCtx({ callback: true });
+
+    await handleFlowCallback(ctx, { kind: 'reminder:pending', days: 14 }, { services: {} as never, store });
+
+    expect(readAddPersonData(store.peek()!).reminderDays).toContain(14);
+
+    await handleFlowCallback(ctx, { kind: 'reminder:pending', days: 14 }, { services: {} as never, store });
+
+    expect(readAddPersonData(store.peek()!).reminderDays).not.toContain(14);
+  });
+
+  /**
+   * Callback data is attacker controlled and the parser only bounds `days` to
+   * 0..365, so the handler has to be the one that knows which offsets exist.
+   */
+  it('refuses an offset the product does not offer', async () => {
+    const store = fakeStore(stateAt('reminders'));
+    const { ctx } = fakeCtx({ callback: true });
+
+    await expect(
+      handleFlowCallback(ctx, { kind: 'reminder:pending', days: 99 }, { services: {} as never, store }),
+    ).rejects.toThrow(ValidationError);
+
+    // The rejected offset must not have reached the state.
+    expect(readAddPersonData(store.peek()!).reminderDays).not.toContain(99);
+  });
+
+  /**
+   * Second line of defence: even if a bad offset were persisted, the state
+   * reader must refuse it rather than pass it on to the person record.
+   */
+  it('rejects persisted state that already holds an unsupported offset', () => {
+    const poisoned = stateAt('reminders', { reminderDays: [7, 99] });
+
+    expect(() => readAddPersonData(poisoned)).toThrow(ValidationError);
   });
 });
 

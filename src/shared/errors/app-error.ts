@@ -51,12 +51,6 @@ export class ConflictError extends AppError {
   }
 }
 
-export class TelegramApiError extends AppError {
-  constructor(message: string, context?: Record<string, unknown>, cause?: unknown) {
-    super(message, { code: 'TELEGRAM_API_ERROR', context, cause });
-  }
-}
-
 export function isAppError(error: unknown): error is AppError {
   return error instanceof AppError;
 }

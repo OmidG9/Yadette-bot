@@ -54,9 +54,9 @@ export class ReminderService {
   /**
    * Every offset the user can toggle, merged with what is actually stored.
    *
-   * This must not create rows: a person whose reminders the user all switched
-   * off has no rows at all, and materialising the defaults here would silently
-   * undo that choice just because the screen was opened.
+   * This must not create rows: offsets the user never touched have no row at
+   * all, and materialising the defaults here would silently turn them on just
+   * because the screen was opened.
    */
   async listForPerson(userId: string, personId: string): Promise<ReminderRecord[]> {
     const existing = await this.reminders.findForPerson(personId, userId);
@@ -99,13 +99,20 @@ export class ReminderService {
 
     // `ensureForPerson` always creates rows enabled, so a freshly created offset
     // still has to be brought to the state the user asked for.
-    const target =
-      current ??
-      (
-        await this.reminders.ensureForPerson(userId, personId, [daysBefore])
-      )[0];
+    //
+    // It returns *every* row of the person, ordered by offset descending, so the
+    // requested row has to be looked up by offset again. Taking the first result
+    // would toggle the person's largest offset instead — switching on "3 days
+    // before" would silently rewrite whatever 30/14/7-day reminder exists.
+    let target = current;
+    if (!target) {
+      await this.reminders.ensureForPerson(userId, personId, [daysBefore]);
+      target = (await this.reminders.findForPerson(personId, userId)).find(
+        (reminder) => reminder.daysBefore === daysBefore,
+      );
+    }
 
-    if (!target) throw new NotFoundError('Reminder', { personId });
+    if (!target) throw new NotFoundError('Reminder', { personId, daysBefore });
     await this.reminders.setEnabled(target.id, personId, userId, enabled);
 
     return this.listForPerson(userId, personId);

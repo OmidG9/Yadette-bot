@@ -162,3 +162,13 @@ export const navCallback = (
 export const saveAddPersonCallback = (): string => 'flow:person:save';
 
 export const addInterestCallback = (personId: string): string => `flow:interest:add:${personId}`;
+
+/** `flow:person:back` — «⏮ قبلی», re-asks the previous question. */
+export const flowBackCallback = (): string => 'flow:person:back';
+
+/** `flow:person:next` — «⏭ بعدی», skips an optional answer. */
+export const flowNextCallback = (): string => 'flow:person:next';
+
+/** `settings:<section>` — the settings screen sections. */
+export const settingsCallback = (section: 'reminders' | 'timezone' | 'language'): string =>
+  `settings:${section}`;

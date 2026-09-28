@@ -1,3 +1,5 @@
+import { readFileSync, readdirSync } from 'node:fs';
+import { join } from 'node:path';
 import { describe, expect, it } from 'vitest';
 import { parseCallbackData } from '../../src/bot/callbacks/data.js';
 import {
@@ -132,6 +134,45 @@ describe('button labels', () => {
     for (const [name, keyboard] of KEYBOARDS) {
       const offending = labels(keyboard).filter((label) => /<[^>]+>/.test(label));
       expect(`${name}: ${offending.join(' | ')}`).toBe(`${name}: `);
+    }
+  });
+});
+
+/**
+ * Callback strings are a wire format with three coupled sides: the builder that
+ * writes it, the parser that reads it, and the dispatcher that acts on it. A
+ * hand-typed payload can only break the first two — it parses fine and then does
+ * nothing — so nothing short of banning the literal can catch it.
+ */
+describe('keyboards never hand-type a callback payload', () => {
+  const RAW = /['`](nav:[a-z]+|person:[a-z:]+|flow:[a-z:]+|reminder:[a-z:]+|interest:[a-z:]+|settings:[a-z:]+)['`]/;
+
+  it('finds no raw payload literals in src/bot/keyboards', () => {
+    const dir = join(process.cwd(), 'src', 'bot', 'keyboards');
+    const offenders: string[] = [];
+
+    for (const file of readdirSync(dir).filter((name) => name.endsWith('.ts'))) {
+      const full = join(dir, file);
+      readFileSync(full, 'utf8')
+        .split('\n')
+        .forEach((line, i) => {
+          // Ignore comment lines: documenting a payload is fine.
+          if (/^\s*(\*|\/\/)/.test(line)) return;
+          if (RAW.test(line)) offenders.push(`${file}:${i + 1}  ${line.trim()}`);
+        });
+    }
+
+    expect(offenders).toEqual([]);
+  });
+
+  it('round-trips every builder through the parser', () => {
+    for (const [name, keyboard] of KEYBOARDS) {
+      for (const data of payloads(keyboard)) {
+        expect(parseCallbackData(data), `${name}: ${data}`).not.toBeNull();
+        // And back out again, so the builder cannot encode something the parser
+        // silently reinterprets.
+        expect(data.length, `${name}: ${data}`).toBeLessThanOrEqual(64);
+      }
     }
   });
 });

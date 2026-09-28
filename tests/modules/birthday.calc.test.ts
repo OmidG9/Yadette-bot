@@ -4,7 +4,6 @@ import {
   isValidBirthdayRule,
   nextOccurrence,
   occurrenceInJalaliYear,
-  reminderDateFor,
   resolveDueOccurrence,
   subtractJalaliDays,
   todayFor,
@@ -139,14 +138,35 @@ describe('resolveDueOccurrence', () => {
   });
 });
 
-describe('reminderDateFor', () => {
-  it('goes back by the requested number of days', () => {
-    // Esfand 1404 has 29 days, so 1405/1/1 minus 7 days is 1404/12/23.
-    const occurrence = occurrenceInJalaliYear(rule(1, 1), 1405);
-    expect(reminderDateFor(occurrence, 7)).toEqual(j(1404, 12, 23));
-    expect(reminderDateFor(occurrence, 3)).toEqual(j(1404, 12, 27));
-    expect(reminderDateFor(occurrence, 1)).toEqual(j(1404, 12, 29));
-    expect(reminderDateFor(occurrence, 0)).toEqual(j(1405, 1, 1));
+/**
+ * The offsets are computed by `resolveDueOccurrence`, which is what the
+ * scheduler actually calls. It has to land on the same day from both sides of
+ * the Esfand boundary, where the Jalali month lengths and the Gregorian ones
+ * disagree.
+ */
+describe('reminder offsets across the Esfand boundary', () => {
+  const newYear = rule(1, 1);
+
+  it.each([
+    [7, j(1404, 12, 23)],
+    [3, j(1404, 12, 27)],
+    [1, j(1404, 12, 29)],
+    [0, j(1405, 1, 1)],
+  ])('%i days before 1405/1/1 is due on %j', (daysBefore, expected) => {
+    expect(resolveDueOccurrence(newYear, expected, daysBefore)?.jalali).toEqual(j(1405, 1, 1));
+  });
+
+  it('does not fire the same offset twice inside the window', () => {
+    for (const [daysBefore, expected] of [
+      [7, j(1404, 12, 23)],
+      [3, j(1404, 12, 27)],
+      [1, j(1404, 12, 29)],
+      [0, j(1405, 1, 1)],
+    ] as const) {
+      // The day after the due date must not match again, or two ticks would
+      // claim the same slot.
+      expect(resolveDueOccurrence(newYear, subtractJalaliDays(expected, -1), daysBefore)).toBeNull();
+    }
   });
 });
 

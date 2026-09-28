@@ -2,7 +2,10 @@ import { InlineKeyboard } from 'grammy';
 import { t, type Language } from '../../shared/i18n/index.js';
 import {
   addInterestCallback,
+  flowBackCallback,
+  flowNextCallback,
   interestDeleteCallback,
+  navCallback,
   personCallback,
   reminderPendingCallback,
   reminderToggleCallback,
@@ -13,9 +16,11 @@ import { reminderLabel } from '../../modules/reminders/reminder.service.js';
 import type { ReminderRecord } from '../../modules/reminders/reminder.types.js';
 import type { InterestRecord } from '../../modules/people/person.types.js';
 
-const CANCEL_DATA = 'nav:menu';
-const BACK_DATA = 'flow:person:back';
-const NEXT_DATA = 'flow:person:next';
+// «❌ لغو» and «⏮ قبلی» are constants: a constant string cannot drift, but a
+// hand-typed one silently can.
+const CANCEL_DATA = navCallback('menu');
+const BACK_DATA = flowBackCallback();
+const NEXT_DATA = flowNextCallback();
 
 /** Reminder toggles for a saved person (§14). */
 export function reminderKeyboard(

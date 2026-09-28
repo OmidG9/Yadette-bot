@@ -1,5 +1,6 @@
 import { InlineKeyboard } from 'grammy';
 import { t, type Language } from '../../shared/i18n/index.js';
+import { navCallback } from '../callbacks/data.js';
 
 /** `/start` payload that opens the add-person flow (Telegram deep link). */
 export const START_ADD_PAYLOAD = 'add';
@@ -20,14 +21,14 @@ export function welcomeKeyboard(username: string | undefined, lang: Language = '
     keyboard.url(cta, `https://t.me/${username}?start=${START_ADD_PAYLOAD}`);
   } else {
     // Without a known username the deep link cannot be built.
-    keyboard.text(cta, 'nav:add');
+    keyboard.text(cta, navCallback('add'));
   }
 
   return keyboard
     .row()
-    .text(t('menu.upcoming', lang), 'nav:upcoming')
-    .text(t('menu.settings', lang), 'nav:settings')
+    .text(t('menu.upcoming', lang), navCallback('upcoming'))
+    .text(t('menu.settings', lang), navCallback('settings'))
     .row()
-    .text(t('menu.help', lang), 'nav:help')
-    .text(t('menu.about', lang), 'nav:about');
+    .text(t('menu.help', lang), navCallback('help'))
+    .text(t('menu.about', lang), navCallback('about'));
 }

@@ -18,7 +18,7 @@ const redactPaths = [
  * Application logger.
  *
  * Secrets are redacted and message bodies are never logged: only identifiers,
- * actions and durations. See `docs` in README ("Logging").
+ * actions and durations. See `docs/logging.md` for the full logging policy.
  */
 export const logger: Logger = pino({
   level: env.LOG_LEVEL,

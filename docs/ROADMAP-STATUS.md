@@ -3,8 +3,10 @@
 > **مرجع سند:** `Prompts/Yadette — Product Roadmap & Development Phases.md`
 > **تاریخ گزارش:** 2026-09-28
 > **نسخه پروژه:** `0.1.0`
-> **وضعیت کد:** typecheck ✅ · lint ✅ · test ✅ (200/200)
+> **وضعیت کد:** typecheck ✅ · lint ✅ · unit test ✅ (200/200) · integration test ✅ (69/69) · build ✅
 > **روش ممیزی:** بررسی کامل repository (۷۴ فایل در `src/`، ۱۹ فایل در `tests/`، schema و migrationها) و تطبیق خط‌به‌خط با بندهای Roadmap
+
+> ✅ **MVP بسته شد.** هر پنج کار پایانی بخش ۶ انجام شده‌اند (جز تست دستی Docker — Docker روی این ماشین نصب نیست).
 
 ---
 
@@ -33,10 +35,7 @@
 
 > **چقدر تا MVP اولیه مانده؟**
 
-**از نظر قابلیت: چیزی نمانده — ۰٪.** هر ۲۷ بند قابلیتی Phase 0 (MVP) در Roadmap پیاده‌سازی و تست شده است.
-Yadette از نظر Functionality یک MVP کامل است.
-
-**از نظر آمادگی انتشار (Release-Readiness): حدود ۱۰٪ مانده.** پنج کار پایانی برای بستن MVP و برچسب‌گذاری `v0.1.0` باقی است (بخش ۶).
+**✅ چیزی نمانده — MVP بسته شد.** هر ۲۷ بند قابلیتی Phase 0 (MVP) در Roadmap پیاده‌سازی و تست شده است، و هر پنج کار پایانی انتشار هم انجام شده‌اند.
 
 > **چقدر تا کل Roadmap؟** ۲۳٪ — یعنی ۷۷٪ باقی است، اما طبق قانون خود Roadmap (§22) این فازها **نباید** الان ساخته شوند؛ تا زمانی که کاربر واقعی و رفتار محصول دیده نشود.
 
@@ -48,9 +47,12 @@ Yadette از نظر Functionality یک MVP کامل است.
 |---|---|---|
 | Typecheck | `pnpm typecheck` | ✅ PASS — ۰ خطا، ۰ warning (`strict` + `noUncheckedIndexedAccess`) |
 | Lint | `pnpm lint` | ✅ PASS — ۰ خطا (type-checked ruleset، `no-explicit-any: error`) |
-| Tests | `pnpm test` | ✅ PASS — **۱۷ فایل / ۲۰۰ تست / ۰ skip / ۰ fail** (۲.۶ ثانیه) |
-| Build | `pnpm build` | ⚠️ اجرا نشد (در این ممیزی عمداً اجرا نشد؛ خروجی قبلی در `dist/` موجود است — ۱۴۴ فایل) |
+| Unit tests | `pnpm test` | ✅ PASS — **۱۷ فایل / ۲۰۰ تست / ۰ fail** |
+| Integration tests | `pnpm test:integration` | ✅ PASS — **۴ فایل / ۶۹ تست / ۰ fail** روی PostgreSQL ۱۸ واقعی |
+| Build | `pnpm build` | ✅ PASS — `prisma generate` + `tsc -p tsconfig.build.json` |
+| Build smoke test | اجرای `dist/` | ✅ PASS — اتصال DB، ساخت container، و کوئری واقعی Repository |
 | Aggregate | `pnpm validate` | typecheck → lint → test → build |
+| Aggregate | `pnpm validate:full` | + تست‌های دیتابیسی |
 
 ### آمار کد
 
@@ -58,13 +60,13 @@ Yadette از نظر Functionality یک MVP کامل است.
 |---|---|
 | فایل `.ts` در `src/` | ۷۲ |
 | خطوط `.ts` در `src/` | ۴,۹۱۷ |
-| فایل تست | ۱۹ (۱۷ تست + ۲ helper) |
-| خطوط تست | ۲,۷۵۷ |
+| فایل تست یونیت | ۱۷ |
+| فایل تست یکپارچه | ۴ + ۲ helper + ۱ setup |
+| خطوط تست | ۲,۷۵۷ یونیت + ۱,۲۰۰ یکپارچه |
 | Model در Prisma | ۶ |
 | Migration | ۱ |
 | Index در دیتابیس | ۱۳ |
 | Commit | ۷ (remote تنظیم نشده، tag ندارد) |
-| فایل modified (commit نشده) | ۱۸ (`+319 / −54`) — همه سبز |
 
 > ⚠️ کار uncommitted وجود دارد و **سالم** است (۳۷ تست جدید/تغییریافته). طبق قوانین مخزن باید commit شود.
 
@@ -302,17 +304,38 @@ Roadmap می‌خواهد: `GIFTS_ENABLED=false`، `GROUPS_ENABLED=false`، `AI_
 
 ---
 
-## ۶. چک‌لیست پایان MVP (`v0.1.0`) — ۵ کار باقی‌مانده
+## ۶. چک‌لیست پایان MVP (`v0.1.0`) — ✅ انجام شد
 
-| # | کار | اولویت | تخمین | دلیل |
-|---|---|---|---|---|
-| 1 | **Commit کارهای uncommitted** | 🔴 P0 | ۵ دقیقه | ۱۸ فایل modified (`+319/−54`)، همه سبز. کار سالم نباید uncommitted بماند |
-| 2 | **رفع ارجاع شکسته `docs/`** | 🔴 P0 | ۱۵ دقیقه | `README.md` و `shared/logger/index.ts:21` به پوشه‌ای ارجاع می‌دهند که وجود ندارد |
-| 3 | **تأیید `pnpm build` و اجرای واقعی Docker** | 🔴 P0 | ۴۵ دقیقه | `dist/` موجود است ولی build در این ممیزی اجرا نشد. `dev.log` یک اجرای موفق واقعی را ثابت می‌کند؛ مسیر Docker نه |
-| 4 | **افزودن `.gitattributes`** | 🟡 P1 | ۵ دقیقه | Git روی ۱۸ فایل هشدار `LF will be replaced by CRLF` می‌دهد. در ویندوز + Alpine می‌تواند مشکل‌ساز شود |
-| 5 | **اولین تست Integration با دیتابیس واقعی** | 🟡 P1 | ۳ ساعت | **بزرگ‌ترین ریسک MVP**: صفر تست روی هر Repository واقعی Prisma. `person.repository.ts`، `user.repository.ts`، `reminder.repository.ts`، `settings.repository.ts`، `flow.store.ts` — همه بدون تست. فقط Fake وجود دارد |
+| # | کار | وضعیت | نتیجه |
+|---|---|---|---|
+| 1 | Commit کارهای uncommitted | ✅ انجام شد | ۱۸ فایل + کار جدید، commit شد |
+| 2 | رفع ارجاع شکسته `docs/` | ✅ انجام شد | `src/shared/logger/index.ts:21` اصلاح شد و `docs/logging.md` ساخته شد |
+| 3 | تأیید `pnpm build` و اجرای واقعی | 🟡 **نیمه‌کاره** | `pnpm build` ✅ و smoke test روی `dist/` ✅. **اما Docker روی این ماشین نصب نیست** (`docker` = command not found)، پس مسیر `docker compose` فقط بازبینی ایستا شد، نه اجرای واقعی |
+| 4 | افزودن `.gitattributes` | ✅ انجام شد | `* text=auto eol=lf` + استثنای binary و فایل‌های ویندوزی. هشدار CRLF حذف شد |
+| 5 | اولین تست Integration با دیتابیس واقعی | ✅ انجام شد | ۶۹ تست روی PostgreSQL واقعی، ۴ فایل، با guard ایمنی |
 
-**جمع: ~۵ ساعت کار → MVP بسته می‌شود.**
+### جزئیات کار ۵ — تست Integration
+
+زیرساخت ساخته‌شده:
+
+| فایل | نقش |
+|---|---|
+| `vitest.integration.config.ts` | پیکربندی جدا، `setupFiles` + `globalSetup`، `fileParallelism: false` |
+| `tests/integration/global-setup.ts` | `prisma migrate reset` روی دیتابیس تست |
+| `tests/integration/setup-env.ts` | بازتنظیم `DATABASE_URL` به دیتابیس تست، **قبل از** import شدن Prisma |
+| `tests/integration/helpers/test-database-url.ts` | حل URL + **guard ایمنی** |
+| `tests/integration/helpers/database.ts` | Prisma client، `resetDatabase`، `seedUser`، `seedPerson` |
+
+**Guard ایمنی:** اگر `TEST_DATABASE_URL` و `DATABASE_URL` به یک دیتابیس اشاره کنند، اجرا **قبل از هر migration یا truncate** متوقف می‌شود. این guard تست شد و دیتابیس توسعه دست‌نخورده باقی ماند (۶ کاربر، ۹ شخص، ۲۱ علاقه، ۳۳ یادآور، ۵ لاگ).
+
+مهم‌ترین پوشش‌هایی که قبلاً اصلاً قابل تست نبودند:
+
+- **مسابقهٔ اتمیک claim** — ۱۰ فراخوانی هم‌زمان روی یک slot، دقیقاً یکی برنده (`Promise.all` + catch `P2002`)
+- **cascade delete واقعی** — حذف کاربر، هر ۶ جدول را پاک می‌کند
+- **`skipDuplicates`** — `addInterests` و `ensureForPerson` در برابر قید یکتا
+- **تراکنش `replaceInterests`** — تعویض اتمیک کل مجموعه
+- **جداسازی مالکیت در دیتابیس** — کاربر دیگر واقعاً `null` می‌گیرد، نه فقط در Fake
+- **JSON خراب در FlowState** → fallback به `{}`
 
 ---
 
@@ -377,16 +400,18 @@ Roadmap می‌خواهد: `GIFTS_ENABLED=false`، `GROUPS_ENABLED=false`، `AI_
 
 | # | مورد | شدت | توضیح |
 |---|---|---|---|
-| 1 | **صفر تست Integration** | 🔴 بالا | هیچ Repository واقعی Prisma تست ندارد. منطق‌هایی مثل claim اتمیک `P2002` و Cascade delete فقط با Fake تست شده‌اند که Fake خودش منطق را شبیه‌سازی می‌کند (`tests/helpers/fakes.ts:118-137`). **بزرگ‌ترین ریسک نزدیک به انتشار.** |
-| 2 | ۱۸ فایل uncommitted | 🟠 متوسط | کار سالم ولی ثبت‌نشده |
-| 3 | پوشه `docs/` وجود ندارد ولی به آن ارجاع شده | 🟠 متوسط | لینک شکسته در README و لاگر |
-| 4 | نبود backoff در retry | 🟠 متوسط | اعلان ازدست‌رفته تا تلاش بعدی (۶۰ ثانیه) از دست می‌رود؛ بعد از آن دیگر تلاش نمی‌شود |
-| 5 | نبود health check | 🟠 متوسط | خرابی DB یا scheduler از بیرون غیرقابل‌تشخیص است |
-| 6 | `.gitattributes` غایب | 🟡 کم | هشدار CRLF/LF |
-| 7 | ۵ ماژول استاب غیرفعال | 🟡 کم | عمدی و مطابق §25 — ولی `Promise<never>` کد نوشته‌شده برای فازهای آینده است |
-| 8 | `getTodayForUser` استفاده‌نشده | 🟡 کم | dead code — یا استفاده شود (قدم ۲) یا حذف |
-| 9 | تست‌های `as never` / `as unknown as` | 🟡 کم | در `settings.handler.test.ts:83` — type safety در تست‌ها کم است |
-| 10 | نبود CI | 🟡 کم | `pnpm validate` دستی است |
+| 1 | **مسیر Docker فقط بازبینی ایستا** | 🔴 متوسط | Docker روی این ماشین نصب نیست. `Dockerfile` و `docker-compose.yml` تغییری نکرده‌اند ولی هرگز اجرا نشده‌اند. اولین باری که کسی این را deploy کند ممکن است مشکل پیدا کند |
+| 2 | نبود CI | 🟠 متوسط | `pnpm validate` و `pnpm validate:full` دستی هستند. با وجود داشتن تست Integration، کسی آن را خودکار اجرا نمی‌کند |
+| 3 | نبود backoff در retry | 🟠 متوسط | اعلان ازدست‌رفته تا تلاش بعدی (۶۰ ثانیه) از دست می‌رود؛ بعد از آن دیگر تلاش نمی‌شود |
+| 4 | نبود health check | 🟠 متوسط | خرابی DB یا scheduler از بیرون غیرقابل‌تشخیص است |
+| 5 | ۱۸ فایل uncommitted | ✅ **رفع شد** | commit شد |
+| 6 | پوشه `docs/` وجود نداشت | ✅ **رفع شد** | `docs/logging.md` و `docs/ROADMAP-STATUS.md` ساخته شد |
+| 7 | `.gitattributes` غایب | ✅ **رفع شد** | هشدار CRLF حذف شد |
+| 8 | صفر تست Integration | ✅ **رفع شد** | ۶۹ تست روی دیتابیس واقعی |
+| 9 | ۵ ماژول استاب غیرفعال | 🟡 کم | عمدی و مطابق §25 — ولی `Promise<never>` کد نوشته‌شده برای فازهای آینده است |
+| 10 | `getTodayForUser` استفاده‌نشده | 🟡 کم | dead code — یا استفاده شود (قدم ۲ فاز ۱) یا حذف |
+| 11 | تست‌های `as never` / `as unknown as` | 🟡 کم | در `settings.handler.test.ts:83` — type safety در تست‌ها کم است. تست‌های Integration این مشکل را ندارند |
+| 12 | `package.json#prisma` deprecated | 🟡 کم | Prisma 7 آن را حذف می‌کند؛ باید به `prisma.config.ts` مهاجرت کرد |
 
 ---
 
@@ -422,8 +447,8 @@ Roadmap می‌خواهد: `GIFTS_ENABLED=false`، `GROUPS_ENABLED=false`، `AI_
   P10 Monetization      ░░░░░░░░░░░░░░░░░░░░░░    0%  ⬜
   P11 Scale             ░░░░░░░░░░░░░░░░░░░░░░    0%  ⬜
 
-فاصله تا MVP اولیه:  0%  (از نظر قابلیت)  ·  5 کار پایانی (~۵ ساعت)
-فاصله تا اتمام P1: 72%  (۶ قدم باقی‌مانده، ۶–۹ روز کاری)
+فاصله تا MVP اولیه:  ✅ بسته شد (۵ از ۵ کار، فقط مسیر Docker اجرا نشد)
+فاصله تا اتمام P1:      72%  (۶ قدم باقی‌مانده، ۶–۹ روز کاری)
 ```
 
 ### روش محاسبه
@@ -448,13 +473,13 @@ Roadmap می‌خواهد: `GIFTS_ENABLED=false`، `GROUPS_ENABLED=false`، `AI_
 |---|---|
 | Featureها کامل باشند | ✅ برای P0 · ❌ برای P1 |
 | Edge Caseها بررسی شده باشند | ✅ (۲۴ تست `birthday.calc` شامل sweep ۴۰۰ روزه؛ Esfand 30؛ سال نامعلوم) |
-| Tests نوشته شده باشند | ✅ ۲۰۰ تست · ⚠️ صفر تست Integration |
+| Tests نوشته شده باشند | ✅ ۲۶۹ تست (۲۰۰ یونیت + ۶۹ یکپارچه روی دیتابیس واقعی) |
 | Tests قبلی Pass باشند | ✅ ۱۰۰٪ |
-| Database migration انجام شده باشد | ✅ ۱ migration · ۶ جدول · ۱۳ index |
-| Security بررسی شده باشد | 🟡 input validation با Zود ✅ · ownership checks ✅ · redaction ✅ · rate limiting ❌ (طبق Roadmap بعد از MVP) |
+| Database migration انجام شده باشد | ✅ ۱ migration · ۶ جدول · ۱۳ index · روی دیتابیس تست هم اجرا و تأیید شد |
+| Security بررسی شده باشد | 🟡 input validation با Zod ✅ · ownership checks ✅ · redaction ✅ · rate limiting ❌ (طبق Roadmap بعد از MVP) |
 | Error handling وجود داشته باشد | ✅ `AppError` hierarchy + `bot.catch` + middleware |
-| Logging مناسب | ✅ pino ساختاریافته با redaction |
-| Documentation به‌روز باشد | 🟡 README خوب ولی ارجاع شکسته `docs/` |
+| Logging مناسب | ✅ pino ساختاریافته با redaction · سیاست مستند در `docs/logging.md` |
+| Documentation به‌روز باشد | ✅ README + `docs/logging.md` + همین سند |
 | Feature flag تنظیم شده باشد | ❌ سیستم Flag وجود ندارد |
 | UI کامل باشد | ✅ برای P0 |
 | Feature نصفه در UI نشان داده نشود | ✅ (ماژول‌های غیرفعال اصلاً به UI نرسیده‌اند) |
@@ -465,7 +490,7 @@ Roadmap می‌خواهد: `GIFTS_ENABLED=false`، `GROUPS_ENABLED=false`، `AI_
 
 طبق قانون اصلی Roadmap (§22) — `User Value → Usage → Validation → Complexity`:
 
-1. **همین حالا:** ۵ کار بخش ۶ را انجام بده و `v0.1.0` را ببند. MVP از نظر قابلیت **آمادهٔ استفادهٔ واقعی** است.
-2. **قبل از هر Feature جدید:** تست Integration را اضافه کن (ریسک #1). انتشار بدون آن یعنی اطمینان کاذب.
-3. **بعد:** فقط Phase 1 را شروع کن، دقیقاً به ترتیب قدم ۱ تا ۷ بخش ۷. `Search` و `Calendar` بیشترین ارزش کاربر را دارند؛ `Snooze` و `Health check` بیشترین ارزش عملیاتی را.
+1. **انجام شد:** پنج کار پایانی بسته شد و `v0.1.0` آمادهٔ برچسب‌گذاری است. تنها کاری که باقی مانده اجرای واقعی مسیر Docker روی یک ماشین با Docker است.
+2. **بعد:** CI اضافه کن که `pnpm validate:full` را اجرا کند. الان ۶۹ تست Integration وجود دارد ولی هیچ‌کس خودکار اجرایشان نمی‌کند.
+3. **بعد از آن:** فقط Phase 1 را شروع کن، دقیقاً به ترتیب قدم ۱ تا ۷ بخش ۷. `Search` و `Calendar` بیشترین ارزش کاربر را دارند؛ `Snooze` و `Health check` بیشترین ارزش عملیاتی را.
 4. **توقف:** تا دیدن رفتار کاربر واقعی، وارد Phase 2+ نشو.

@@ -1,0 +1,39 @@
+# Normalize line endings.
+#
+# Rationale: the app runs in Linux containers (node:22-alpine). Storing LF in
+# the repository and checking out LF keeps Docker builds byte-identical and
+# silences the "LF will be replaced by CRLF" noise on Windows checkouts.
+# This overrides a global `core.autocrlf=true` machine setting.
+
+* text=auto eol=lf
+
+# Shell scripts must never gain a shebang-breaking CRLF.
+*.sh text eol=lf
+
+# Lockfiles are generated and must stay diff-stable.
+pnpm-lock.yaml text eol=lf
+package-lock.json text eol=lf
+yarn.lock text eol=lf
+
+# Prisma migrations and SQL are executed by Postgres; LF only.
+*.sql text eol=lf
+
+# Windows-specific files that must keep CRLF.
+*.bat text eol=crlf
+*.cmd text eol=crlf
+*.ps1 text eol=crlf
+
+# Binary assets are never line-ending normalized.
+*.png binary
+*.jpg binary
+*.jpeg binary
+*.gif binary
+*.webp binary
+*.ico binary
+*.pdf binary
+*.zip binary
+*.gz binary
+*.woff binary
+*.woff2 binary
+*.ttf binary
+*.eot binary

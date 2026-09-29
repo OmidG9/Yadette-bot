@@ -1,5 +1,6 @@
 import { beforeEach, describe, expect, it } from 'vitest';
 import { ReminderService, reminderLabel } from '../../src/modules/reminders/reminder.service.js';
+import { RETRY_MAX_ATTEMPTS } from '../../src/modules/reminders/retry.js';
 import { ValidationError } from '../../src/shared/errors/index.js';
 import { FakeReminderRepository, FakeUserRepository, fakeUser } from '../helpers/fakes.js';
 
@@ -99,14 +100,35 @@ describe('ReminderService.findDueNotifications', () => {
     expect(await service.findDueNotifications(birthday)).toHaveLength(0);
   });
 
-  it('keeps reporting a slot released after a failed delivery', async () => {
+  /**
+   * Regression (§3.6).
+   *
+   * The old design deleted the claim on failure, on the assumption that the next
+   * tick would pick the reminder up again. It would not: `resolveDueOccurrence`
+   * only matches the exact day, so once the moment had passed the reminder was
+   * gone for good. A failed send silently swallowed a birthday notification.
+   *
+   * A failed slot is now held as `pending` and drained by the retry pass
+   * instead, which is why it is absent from the due list and present in retries.
+   */
+  it('moves a failed slot out of the due list and into the retry pass', async () => {
     const birthday = new Date('2026-10-10T06:00:00.000Z');
     const claimed = await service.claim(only(await service.findDueNotifications(birthday)));
     expect(claimed).not.toBeNull();
 
-    await service.release(claimed!.log.id);
+    const failure = await service.handleFailure(claimed!.log.id, claimed!.log.attempts, 'telegram 502', birthday);
+    expect(failure.retrying).toBe(true);
 
-    expect(await service.findDueNotifications(birthday)).toHaveLength(1);
+    // Not due any more: the moment has passed and re-running would double-send.
+    expect(await service.findDueNotifications(birthday)).toHaveLength(0);
+
+    // But the reminder is still owed, and the retry pass can see it once the
+    // backoff has elapsed.
+    expect(await service.findDueRetries(birthday)).toHaveLength(0);
+    const later = new Date(birthday.getTime() + 10 * 60_000);
+    const retries = await service.findDueRetries(later);
+    expect(retries).toHaveLength(1);
+    expect(retries[0]!.due.person.id).toBe(person.id);
   });
 
   it('reports the same slot again for the next Jalali year', async () => {
@@ -250,13 +272,21 @@ describe('ReminderService notification claims', () => {
     expect(reminders.logCount()).toBe(1);
   });
 
-  it('treats a second claim as already sent', async () => {
+  /**
+   * A claim is an intent to send, not a delivery. §3.6 splits the two so that a
+   * failed send stays owed instead of being counted as already notified.
+   */
+  it('does not count a mere claim as sent', async () => {
     const due = only(await service.findDueNotifications(new Date('2026-10-10T06:00:00.000Z')));
     expect(await service.wasSent(due)).toBe(false);
 
     const claim = await service.claim(due);
-    expect(await service.wasSent(due)).toBe(true);
     expect(claim?.log.daysBefore).toBe(due.daysBefore);
+    expect(claim?.log.status).toBe('pending');
+    expect(await service.wasSent(due)).toBe(false);
+
+    await service.markSent(claim!.log.id, new Date('2026-10-10T06:00:00.000Z'));
+    expect(await service.wasSent(due)).toBe(true);
   });
 
   it('keeps claims of different days independent', async () => {
@@ -272,15 +302,47 @@ describe('ReminderService notification claims', () => {
     expect(await service.claim(birthday)).toBeNull();
   });
 
-  it('allows a retry after a failed delivery releases the claim', async () => {
+  /**
+   * A failed delivery must not count as sent, or the reminder would be
+   * abandoned instead of retried. The claim stays, so `claim` still refuses —
+   * that is what makes a concurrent run unable to double-send.
+   */
+  it('keeps a failed slot un-sent and claimed for retry', async () => {
     const due = only(await service.findDueNotifications(new Date('2026-10-10T06:00:00.000Z')));
     const claim = await service.claim(due);
     expect(claim).not.toBeNull();
 
-    await service.release(claim!.log.id);
+    await service.handleFailure(claim!.log.id, claim!.log.attempts, 'telegram 502', new Date('2026-10-10T06:00:00.000Z'));
 
     expect(await service.wasSent(due)).toBe(false);
-    expect(await service.claim(due)).not.toBeNull();
+    expect(await service.claim(due)).toBeNull();
+  });
+
+  /** §3.6 — a run of failures gives up rather than retrying forever. */
+  it('gives up after the attempt budget is spent', async () => {
+    const now = new Date('2026-10-10T06:00:00.000Z');
+    const due = only(await service.findDueNotifications(now));
+    const claim = await service.claim(due);
+    expect(claim).not.toBeNull();
+
+    const outcome = await service.handleFailure(claim!.log.id, RETRY_MAX_ATTEMPTS, 'telegram 502', now);
+    expect(outcome.retrying).toBe(false);
+    expect(outcome.nextAttemptAt).toBeNull();
+
+    // A failed slot is not retried either.
+    expect(await service.findDueRetries(new Date(now.getTime() + 86_400_000))).toHaveLength(0);
+  });
+
+  /** A successful send closes the slot, and only then does it count as sent. */
+  it('marks a delivered slot as sent', async () => {
+    const now = new Date('2026-10-10T06:00:00.000Z');
+    const due = only(await service.findDueNotifications(now));
+    const claim = await service.claim(due);
+    expect(claim).not.toBeNull();
+
+    expect(await service.wasSent(due)).toBe(false);
+    await service.markSent(claim!.log.id, now);
+    expect(await service.wasSent(due)).toBe(true);
   });
 
   it('does not repeat a notification the next year', async () => {

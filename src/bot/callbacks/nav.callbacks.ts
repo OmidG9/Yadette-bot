@@ -13,8 +13,13 @@ import {
 } from '../views/settings.views.js';
 import { helpText, aboutText, welcomeText } from '../views/menu.views.js';
 import { upcomingListText } from '../views/person.views.js';
+import { dashboardText } from '../views/dashboard.views.js';
+import { calendarKeyboard, calendarText } from '../views/calendar.views.js';
+import { healthText, type HealthReport } from '../../modules/health/health.service.js';
+import { featureFlags } from '../../config/feature-flags.js';
 import { toError } from '../../shared/errors/index.js';
 import { startAddPerson } from '../conversations/add-person.js';
+import { startSearch } from '../conversations/search.js';
 import { hydrateContext } from '../middleware/hydrate-user.js';
 import type { FlowStore } from '../conversations/flow.store.js';
 import type { Services } from '../../container.js';
@@ -22,6 +27,11 @@ import type { Services } from '../../container.js';
 export interface NavDeps {
   services: Services;
   flowStore: FlowStore;
+  /**
+   * Optional so a test can exercise the nav handler without a live database.
+   * Without it the `health` section reports the database as unknown.
+   */
+  health?: { check(now?: Date): Promise<HealthReport> };
 }
 
 /** `nav:*` callbacks: main menu sections. */
@@ -51,7 +61,11 @@ export async function handleNavCallback(
       const username = ctx.me.username;
       const text = welcomeText(user, false, peopleCount, lang);
       const body = username ? text : `${text}\n\n${t('start.ctaFallback', lang)}`;
-      await editOrSend(ctx, body, welcomeKeyboard(username, lang));
+      await editOrSend(
+        ctx,
+        body,
+        welcomeKeyboard({ username, lang, flags: featureFlags }),
+      );
       return true;
     }
 
@@ -79,6 +93,52 @@ export async function handleNavCallback(
       return true;
     }
 
+    // §3.1 — the home screen. Kept behind its own flag: with the flag off the
+    // button is gone too, so `dashboard` is unreachable and the branch is inert.
+    case 'dashboard': {
+      if (!featureFlags.isEnabled('dashboard')) return false;
+      await ackCallback(ctx);
+      const buckets = await services.birthdays.getDashboardForUser(ctx.state.user.id);
+      if (!buckets) {
+        await editOrSend(ctx, welcomeText(ctx.state.user, false, 0, lang), welcomeKeyboard({
+          username: ctx.me.username,
+          lang,
+          flags: featureFlags,
+        }));
+        return true;
+      }
+      await editOrSend(ctx, dashboardText(buckets, lang), welcomeKeyboard({
+        username: ctx.me.username,
+        lang,
+        flags: featureFlags,
+      }));
+      return true;
+    }
+
+    // §3.3 — search needs a typed query, so it hands over to a conversation.
+    case 'search': {
+      if (!featureFlags.isEnabled('search')) return false;
+      await ackCallback(ctx);
+      await startSearch(ctx, flowStore);
+      return true;
+    }
+
+    // §3.2 — birthdays by Jalali month.
+    case 'calendar': {
+      if (!featureFlags.isEnabled('calendar')) return false;
+      await ackCallback(ctx);
+      await showCalendar(ctx, services);
+      return true;
+    }
+
+    // Operational probe, deliberately reachable from the menu so a problem can
+    // be diagnosed without shell access.
+    case 'health': {
+      if (!featureFlags.isEnabled('healthCheck')) return false;
+      await ackCallback(ctx);
+      await showHealth(ctx, deps);
+      return true;
+    }
     case 'help': {
       await ackCallback(ctx);
       await editOrSend(ctx, helpText(lang));
@@ -101,6 +161,48 @@ export async function handleNavCallback(
 export async function showUpcomingList(ctx: AppContext, services: Services): Promise<void> {
   const items = await services.birthdays.getUpcomingForUser(ctx.state.user.id);
   await editOrSend(ctx, upcomingListText(items, ctx.state.lang), listKeyboard(items));
+}
+
+/** §3.2 — the current Jalali month of birthdays. */
+export async function showCalendar(
+  ctx: AppContext,
+  services: Services,
+  target?: { year: number; month: number },
+): Promise<void> {
+  const result = await services.birthdays.getCalendarForUser(ctx.state.user.id, target);
+  if (!result) {
+    await editOrSend(ctx, t('errors.generic', ctx.state.lang));
+    return;
+  }
+
+  await editOrSend(
+    ctx,
+    calendarText(result.month, ctx.state.lang),
+    calendarKeyboard(result.month, result.today, ctx.state.lang),
+  );
+}
+
+/**
+ * §3.6 — health probe.
+ *
+ * A failed probe is reported, never thrown: a health check that takes the bot
+ * down while it is diagnosing a problem is worse than no health check.
+ */
+async function showHealth(ctx: AppContext, deps: NavDeps): Promise<void> {
+  const lang = ctx.state.lang;
+
+  if (!deps.health) {
+    await editOrSend(ctx, t('health.degraded', lang));
+    return;
+  }
+
+  try {
+    const report = await deps.health.check();
+    await editOrSend(ctx, healthText(report, lang), listKeyboard([]));
+  } catch (error) {
+    logger.error({ event: 'health.check.failed', err: toError(error) }, 'health probe threw');
+    await editOrSend(ctx, t('health.degraded', lang));
+  }
 }
 
 /** `settings:*` callbacks. */

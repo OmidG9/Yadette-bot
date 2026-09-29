@@ -9,6 +9,7 @@ import { PrismaReminderRepository } from './modules/reminders/reminder.repositor
 import { ReminderService } from './modules/reminders/reminder.service.js';
 import { PrismaSettingsRepository } from './modules/settings/settings.repository.js';
 import { SettingsService } from './modules/settings/settings.service.js';
+import { HealthService, type SchedulerProbe } from './modules/health/health.service.js';
 import { PrismaFlowStore } from './bot/conversations/flow.store.js';
 
 export interface Services {
@@ -17,6 +18,7 @@ export interface Services {
   birthdays: BirthdayService;
   reminders: ReminderService;
   settings: SettingsService;
+  health: HealthService;
 }
 
 export interface Container {
@@ -30,7 +32,7 @@ export interface Container {
  * Handlers receive services, services receive repository interfaces, and only
  * this file knows about Prisma. Tests build the same graph with in-memory fakes.
  */
-export function createContainer(): Container {
+export function createContainer(scheduler?: SchedulerProbe): Container {
   const userRepository = new PrismaUserRepository(prisma);
   const personRepository = new PrismaPersonRepository(prisma);
   const reminderRepository = new PrismaReminderRepository(prisma);
@@ -43,6 +45,9 @@ export function createContainer(): Container {
     birthdays: new BirthdayService(personRepository, userRepository),
     reminders: new ReminderService(reminderRepository, userRepository),
     settings: new SettingsService(settingsRepository),
+    // `SELECT 1` is the cheapest statement that still proves the pool can hand
+    // out a connection; `$queryRaw` would need a tagged template.
+    health: new HealthService({ ping: () => prisma.$queryRaw`SELECT 1` }, scheduler),
   };
 
   return { services, flowStore };

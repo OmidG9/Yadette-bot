@@ -1,9 +1,13 @@
 import { notificationSlotKey } from '../../src/modules/reminders/reminder.types.js';
+import { leaseUntil } from '../../src/modules/reminders/retry.js';
 import type {
+  DueRetry,
+  DueSnooze,
   NotificationLogRecord,
   ReminderRecord,
   ReminderRepository,
   ReminderWithPerson,
+  SnoozeRecord,
 } from '../../src/modules/reminders/reminder.types.js';
 import type { UserRecord, UserRepository, UpsertTelegramUserInput } from '../../src/modules/users/user.types.js';
 import type { Language } from '../../src/shared/i18n/index.js';
@@ -12,6 +16,7 @@ import type { Language } from '../../src/shared/i18n/index.js';
 export class FakeReminderRepository implements ReminderRepository {
   private reminders: ReminderRecord[] = [];
   private logs: NotificationLogRecord[] = [];
+  private snoozes: SnoozeRecord[] = [];
   private sequence = 0;
 
   constructor(private readonly defaultDays: number[] = [7, 3, 1, 0]) {}
@@ -107,12 +112,19 @@ export class FakeReminderRepository implements ReminderRepository {
     );
   }
 
-  async findLogKeys(userId: string): Promise<Set<string>> {
+  async findHandledSlotKeys(userId: string): Promise<Set<string>> {
     return new Set(
       this.logs
         .filter((log) => log.userId === userId)
         .map((log) => notificationSlotKey(log.personId, log.birthdayYear, log.daysBefore)),
     );
+  }
+
+  async findLogByIdForUser(
+    logId: string,
+    userId: string,
+  ): Promise<NotificationLogRecord | null> {
+    return this.logs.find((log) => log.id === logId && log.userId === userId) ?? null;
   }
 
   async claimNotification(input: {
@@ -130,19 +142,177 @@ export class FakeReminderRepository implements ReminderRepository {
     const record: NotificationLogRecord = {
       id: `log${this.sequence}`,
       ...input,
-      sentAt: new Date(),
+      status: 'pending',
+      attempts: 1,
+      nextAttemptAt: new Date(),
+      lastError: null,
+      sentAt: null,
     };
     this.logs.push(record);
     return record;
   }
 
-  async releaseNotification(logId: string): Promise<void> {
-    this.logs = this.logs.filter((log) => log.id !== logId);
+  async markSent(logId: string, sentAt: Date): Promise<void> {
+    const log = this.logs.find((item) => item.id === logId);
+    if (!log) return;
+    log.status = 'sent';
+    log.sentAt = sentAt;
+    log.lastError = null;
+  }
+
+  async scheduleRetry(
+    logId: string,
+    attempt: number,
+    nextAttemptAt: Date,
+    error: string,
+  ): Promise<void> {
+    const log = this.logs.find((item) => item.id === logId);
+    if (!log) return;
+    log.status = 'pending';
+    log.attempts = attempt;
+    log.nextAttemptAt = nextAttemptAt;
+    log.lastError = error;
+  }
+
+  async markFailed(logId: string, error: string): Promise<void> {
+    const log = this.logs.find((item) => item.id === logId);
+    if (!log) return;
+    log.status = 'failed';
+    log.lastError = error;
+  }
+
+  async findDueRetries(now: Date, limit: number): Promise<DueRetry[]> {
+    return this.logs
+      .filter((log) => log.status === 'pending' && log.nextAttemptAt <= now)
+      .slice(0, limit)
+      .map((log) => ({ log, userId: log.userId, person: this.personOf(log.personId) }));
+  }
+
+  async leaseRetry(logId: string, now: Date): Promise<boolean> {
+    const log = this.logs.find((item) => item.id === logId);
+    if (!log || log.status !== 'pending' || log.nextAttemptAt > now) return false;
+    log.nextAttemptAt = leaseUntil(now);
+    return true;
+  }
+
+  async leaseSnooze(snoozeId: string, now: Date): Promise<boolean> {
+    const snooze = this.snoozes.find((item) => item.id === snoozeId);
+    if (!snooze || snooze.status !== 'pending' || snooze.nextAttemptAt > now) return false;
+    snooze.nextAttemptAt = leaseUntil(now);
+    return true;
+  }
+
+  // --- Snooze ---------------------------------------------------------------
+
+  async upsertSnooze(input: {
+    userId: string;
+    personId: string;
+    birthdayYear: number;
+    daysBefore: number;
+    deliverAt: Date;
+  }): Promise<SnoozeRecord> {
+    const existing = await this.findSnooze(input.userId, input.personId, input.birthdayYear, input.daysBefore);
+
+    if (existing) {
+      existing.deliverAt = input.deliverAt;
+      existing.nextAttemptAt = input.deliverAt;
+      existing.status = 'pending';
+      existing.attempts = 0;
+      existing.lastError = null;
+      return existing;
+    }
+
+    this.sequence += 1;
+    const record: SnoozeRecord = {
+      id: `snz${this.sequence}`,
+      userId: input.userId,
+      personId: input.personId,
+      birthdayYear: input.birthdayYear,
+      daysBefore: input.daysBefore,
+      deliverAt: input.deliverAt,
+      status: 'pending',
+      attempts: 0,
+      nextAttemptAt: input.deliverAt,
+      lastError: null,
+      sentAt: null,
+    };
+    this.snoozes.push(record);
+    return record;
+  }
+
+  async findSnooze(
+    userId: string,
+    personId: string,
+    birthdayYear: number,
+    daysBefore: number,
+  ): Promise<SnoozeRecord | null> {
+    return (
+      this.snoozes.find(
+        (item) =>
+          item.userId === userId &&
+          item.personId === personId &&
+          item.birthdayYear === birthdayYear &&
+          item.daysBefore === daysBefore,
+      ) ?? null
+    );
+  }
+
+  async markSnoozeSent(snoozeId: string, sentAt: Date): Promise<void> {
+    const snooze = this.snoozes.find((item) => item.id === snoozeId);
+    if (!snooze) return;
+    snooze.status = 'sent';
+    snooze.sentAt = sentAt;
+    snooze.lastError = null;
+  }
+
+  async scheduleSnoozeRetry(
+    snoozeId: string,
+    attempt: number,
+    nextAttemptAt: Date,
+    error: string,
+  ): Promise<void> {
+    const snooze = this.snoozes.find((item) => item.id === snoozeId);
+    if (!snooze) return;
+    snooze.status = 'pending';
+    snooze.attempts = attempt;
+    snooze.nextAttemptAt = nextAttemptAt;
+    snooze.lastError = error;
+  }
+
+  async markSnoozeFailed(snoozeId: string, error: string): Promise<void> {
+    const snooze = this.snoozes.find((item) => item.id === snoozeId);
+    if (!snooze) return;
+    snooze.status = 'failed';
+    snooze.lastError = error;
+  }
+
+  async findDueSnoozes(now: Date, limit: number): Promise<DueSnooze[]> {
+    return this.snoozes
+      .filter((item) => item.status === 'pending' && item.nextAttemptAt <= now)
+      .slice(0, limit)
+      .map((snooze) => ({ snooze, person: this.personOf(snooze.personId) }));
+  }
+
+  private personOf(personId: string): ReminderWithPerson['person'] {
+    return {
+      id: personId,
+      name: 'Sara',
+      birthMonth: 7,
+      birthDay: 18,
+      birthYear: 1380,
+      notes: null,
+      interests: [],
+    };
   }
 
   /** Test helper. */
   logCount(): number {
     return this.logs.length;
+  }
+
+  /** Test helper: snooze rows currently stored. */
+  snoozeCount(): number {
+    return this.snoozes.length;
   }
 }
 

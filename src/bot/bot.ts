@@ -11,15 +11,22 @@ import type { FlowStore } from './conversations/flow.store.js';
 import { createAddPersonFlow, startAddPerson } from './conversations/add-person.js';
 import { createEditPersonFlow } from './conversations/edit-person.js';
 import { createAddInterestFlow } from './conversations/add-interest.js';
+import { createSearchFlow } from './conversations/search.js';
 import { handleStart } from './commands/start.js';
 import { handleCancel } from './commands/cancel.js';
 import { mainMenuLabels, mainMenuKeyboard } from './keyboards/main.js';
 import { settingsKeyboard } from './keyboards/settings.js';
 import { parseCallbackData } from './callbacks/data.js';
-import { handleNavCallback, handleSettingsCallback, showUpcomingList } from './callbacks/nav.callbacks.js';
+import {
+  handleNavCallback,
+  handleSettingsCallback,
+  showCalendar,
+  showUpcomingList,
+} from './callbacks/nav.callbacks.js';
 import { handlePersonCallback } from './callbacks/person.callbacks.js';
 import { handleFlowCallback, handleInterestDelete } from './callbacks/flow.callbacks.js';
 import { handleReminderToggle } from './callbacks/reminder.callbacks.js';
+import { handleSnoozeCallback } from './callbacks/snooze.callbacks.js';
 import { settingsText } from './views/settings.views.js';
 import { helpText, aboutText } from './views/menu.views.js';
 import { ackCallback, editOrSend, sendText } from './helpers.js';
@@ -45,6 +52,7 @@ export function createBot({ token, services, flowStore, client }: CreateBotDeps)
     createAddPersonFlow(flowStore),
     createEditPersonFlow(services, flowStore),
     createAddInterestFlow(services, flowStore),
+    createSearchFlow(flowStore, services),
   ];
 
   bot.use(errorHandler());
@@ -140,8 +148,10 @@ async function dispatchCallback(
   services: Services,
   flowStore: FlowStore,
 ): Promise<boolean> {
+  const deps = { services, flowStore, health: services.health };
+
   if (data.kind.startsWith('nav:')) {
-    return handleNavCallback(ctx, data.kind.slice(4), { services, flowStore });
+    return handleNavCallback(ctx, data.kind.slice(4), deps);
   }
 
   // `person:edit` and `person:edit:<field>` must be matched before the
@@ -164,6 +174,17 @@ async function dispatchCallback(
 
   if (data.kind === 'reminder:toggle') {
     return handleReminderToggle(ctx, data, services);
+  }
+
+  // §3.2 — month paging. An absolute year/month, so it survives «قبلی»/«بعدی».
+  if (data.kind === 'cal:month') {
+    await ackCallback(ctx);
+    await showCalendar(ctx, services, { year: data.year as number, month: data.month as number });
+    return true;
+  }
+
+  if (data.kind.startsWith('snooze:')) {
+    return handleSnoozeCallback(ctx, data, services);
   }
 
   if (data.kind.startsWith('settings:')) {

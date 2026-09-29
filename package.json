@@ -1,6 +1,6 @@
 {
   "name": "yadette-bot",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "private": true,
   "type": "module",
   "packageManager": "pnpm@12.6.0",
@@ -26,6 +26,7 @@
     "db:migrate:deploy": "prisma migrate deploy",
     "db:push": "prisma db push",
     "db:studio": "prisma studio",
+    "db:check-search-folding": "tsx scripts/check-search-backfill.ts",
     "validate": "pnpm typecheck && pnpm lint && pnpm test && pnpm build",
     "validate:full": "pnpm typecheck && pnpm lint && pnpm test:all && pnpm build"
   },

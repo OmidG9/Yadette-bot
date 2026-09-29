@@ -1,25 +1,25 @@
 # Yadette — گزارش وضعیت توسعه (Roadmap Status Report)
 
 > **مرجع سند:** `Prompts/Yadette — Product Roadmap & Development Phases.md`
-> **تاریخ گزارش:** 2026-09-28
-> **نسخه پروژه:** `0.1.0`
-> **وضعیت کد:** typecheck ✅ · lint ✅ · unit test ✅ (200/200) · integration test ✅ (69/69) · build ✅
-> **روش ممیزی:** بررسی کامل repository (۷۴ فایل در `src/`، ۱۹ فایل در `tests/`، schema و migrationها) و تطبیق خط‌به‌خط با بندهای Roadmap
+> **تاریخ گزارش:** 2026-09-29
+> **نسخه پروژه:** `0.2.0`
+> **وضعیت کد:** typecheck ✅ · lint ✅ · unit test ✅ (291/291) · integration test ✅ (91/91) · build ✅
+> **روش ممیزی:** بررسی کامل repository و تطبیق خط‌به‌خط با بندهای Roadmap
 
-> ✅ **MVP بسته شد.** هر پنج کار پایانی بخش ۶ انجام شده‌اند (جز تست دستی Docker — Docker روی این ماشین نصب نیست).
+> ✅ **فاز P1 بسته شد.** هر ۹ بند بخش ۳ Roadmap پیاده‌سازی و تست شده‌اند (جز تست دستی Docker — Docker روی این ماشین نصب نیست).
 
 ---
 
 ## ۱. خلاصه اجرایی
 
 ```text
-پیشرفت کل Roadmap (P0 → P11)   ████░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░  23%
+پیشرفت کل Roadmap (P0 → P11)   ████████████████████████████████████░░░░  34%
 ```
 
 | فاز | نام | وضعیت | درصد |
 |---|---|---|---|
 | P0 | MVP / Foundation | ✅ کامل | **100%** |
-| P1 | UX + Reliability | 🟡 ناقص | **28%** |
+| P1 | UX + Reliability | ✅ کامل | **100%** |
 | P2 | Gift System | ⬜ شروع نشده | 0% |
 | P3 | AI Layer | ⬜ شروع نشده | 0% |
 | P4 | Group Birthday | ⬜ شروع نشده | 0% |
@@ -37,7 +37,7 @@
 
 **✅ چیزی نمانده — MVP بسته شد.** هر ۲۷ بند قابلیتی Phase 0 (MVP) در Roadmap پیاده‌سازی و تست شده است، و هر پنج کار پایانی انتشار هم انجام شده‌اند.
 
-> **چقدر تا کل Roadmap؟** ۲۳٪ — یعنی ۷۷٪ باقی است، اما طبق قانون خود Roadmap (§22) این فازها **نباید** الان ساخته شوند؛ تا زمانی که کاربر واقعی و رفتار محصول دیده نشود.
+> **چقدر تا کل Roadmap؟** ۳۴٪ — یعنی ۶۶٪ باقی است، اما طبق قانون خود Roadmap (§22) این فازها **نباید** الان ساخته شوند؛ تا زمانی که کاربر واقعی و رفتار محصول دیده نشود.
 
 ---
 
@@ -47,8 +47,9 @@
 |---|---|---|
 | Typecheck | `pnpm typecheck` | ✅ PASS — ۰ خطا، ۰ warning (`strict` + `noUncheckedIndexedAccess`) |
 | Lint | `pnpm lint` | ✅ PASS — ۰ خطا (type-checked ruleset، `no-explicit-any: error`) |
-| Unit tests | `pnpm test` | ✅ PASS — **۱۷ فایل / ۲۰۰ تست / ۰ fail** |
-| Integration tests | `pnpm test:integration` | ✅ PASS — **۴ فایل / ۶۹ تست / ۰ fail** روی PostgreSQL ۱۸ واقعی |
+| Unit tests | `pnpm test` | ✅ PASS — **۲۴ فایل / ۲۹۱ تست / ۰ fail** |
+| Integration tests | `pnpm test:integration` | ✅ PASS — **۴ فایل / ۹۱ تست / ۰ fail** روی PostgreSQL ۱۸ واقعی |
+| Search folding parity | `pnpm db:check-search-folding` | ✅ PASS — ۱۳ نمونه، تطبیق کاملِ نرمال‌سازی TS و SQL |
 | Build | `pnpm build` | ✅ PASS — `prisma generate` + `tsc -p tsconfig.build.json` |
 | Build smoke test | اجرای `dist/` | ✅ PASS — اتصال DB، ساخت container، و کوئری واقعی Repository |
 | Aggregate | `pnpm validate` | typecheck → lint → test → build |
@@ -58,17 +59,17 @@
 
 | شاخص | مقدار |
 |---|---|
-| فایل `.ts` در `src/` | ۷۲ |
-| خطوط `.ts` در `src/` | ۴,۹۱۷ |
-| فایل تست یونیت | ۱۷ |
-| فایل تست یکپارچه | ۴ + ۲ helper + ۱ setup |
-| خطوط تست | ۲,۷۵۷ یونیت + ۱,۲۰۰ یکپارچه |
-| Model در Prisma | ۶ |
-| Migration | ۱ |
-| Index در دیتابیس | ۱۳ |
-| Commit | ۷ (remote تنظیم نشده، tag ندارد) |
+| فایل `.ts` در `src/` | ۸۵ |
+| خطوط `.ts` در `src/` | ۶,۸۶۵ |
+| فایل تست یونیت | ۲۴ |
+| فایل تست یکپارچه | ۴ + ۷ helper/setup |
+| خطوط تست | ۴,۲۲۹ یونیت + ۹۴۴ یکپارچه |
+| Model در Prisma | ۷ |
+| Migration | ۳ |
+| Index در دیتابیس | ۱۳ + ایندکس `Person.searchText` |
+| Commit | ۹ (remote تنظیم نشده، tag ندارد) |
 
-> ⚠️ کار uncommitted وجود دارد و **سالم** است (۳۷ تست جدید/تغییریافته). طبق قوانین مخزن باید commit شود.
+> ⚠️ کار uncommitted وجود دارد و **سالم** است (تست‌های جدید + تغییرات P1). طبق قوانین مخزن باید commit شود.
 
 ---
 
@@ -198,23 +199,23 @@ src/
 
 ---
 
-### فاز P1 — UX + Reliability → **28%** 🟡
+### فاز P1 — UX + Reliability → **100%** ✅
 
 Roadmap §3.7 — Definition of Done:
 
 | # | بند | وضعیت | جزئیات |
 |---|---|---|---|
-| 1 | Search | ❌ **MISSING** | صفر مورد `search` در کل `src/`. هیچ `contains`/`ilike`‌ای وجود ندارد. ایندکس `Person_userId_name_idx` ساخته شده ولی **هیچ کوئری‌ای از آن استفاده نمی‌کند**. |
-| 2 | Calendar | ❌ **MISSING** | صفر مورد calendar view. `NAV_TARGETS` (`data.ts:23`) ورودی calendar ندارد. تمام موارد `calendar` کامنت دربارهٔ تقویم جلالی است. |
-| 3 | Dashboard بهتر | 🟡 **PARTIAL** | صفحه اصلی وجود دارد (`nav.callbacks.ts:46-56` + `keyboards/start.ts:16`) و تست رگرسیون دارد، ولی **بندهای Roadmap §3.1 غایب‌اند**: بدون `🔴 امروز / 🟠 این هفته / 🟢 بعداً`، بدون خط «نزدیک‌ترین تولد»، بدون «تعداد تولدهای این ماه». نکته: `birthday.service.ts:40` `getTodayForUser` نوشته شده ولی **هرگز فراخوانی نمی‌شود** — dead code. |
-| 4 | Reminder customization | ✅ **DONE** | `reminder.service.ts:87` `setEnabled` — ۶ آفست مستقل برای هر شخص. مثال Roadmap §3.4 کامل پوشش داده شده. |
-| 5 | Snooze | ❌ **MISSING** | صفر مورد. **از نظر ساختاری غیرممکن است**: اعلان با `sendMessage` و **بدون هیچ inline keyboard** ارسال می‌شود (`job:79`) — پس دکمه‌ای برای Snooze وجود ندارد. مدل داده هم ندارد. |
-| 6 | Notification retry | 🟡 **PARTIAL** | فقط retry در تیک بعدی از طریق `claim`/`release` (`reminder.service.ts:199`, `job:93`). **فقدان:** exponential backoff، شمارنده attempt، max-attempts، dead-letter، صف خطا. |
-| 7 | Health check | ❌ **MISSING** | هیچ HTTP server، هیچ endpoint، هیچ metric. آنچه هست: لاگ ساختاریافته با `durationMs` (`reminder.scheduler.ts:75`) · Scheduler بدون‌هم‌پوشانی (`running` guard L65) · `bot.catch` با تفکیک GrammyError/HttpError (`bot.ts:189`) · فقط `db` در compose healthcheck دارد. |
-| 8 | تست کامل Featureهای جدید | ⬜ N/A | تا وقتی Search/Calendar/Snooze ساخته نشوند، تستی وجود ندارد. |
-| 9 | Update README | 🟡 **PARTIAL** | README (۹۴ خط، فارسی) خوب است ولی به پوشه `docs/` ارجاع می‌دهد که **وجود ندارد** — لینک شکسته. `shared/logger/index.ts:21` هم ارجاع مشابه دارد. |
+| 1 | Search | ✅ **DONE** | `person.repository.ts` `searchForUser` · `birthday.service.ts` `searchForUser` (با زمینهٔ تولد) · `conversations/search.ts` · نرمال‌سازی فارسی (`shared/utils/persian.ts`). **نکتهٔ معماری:** query نرمال می‌شود اما متن ذخیره‌شده هم باید باشد، وگرنه جستجوی «كتاب» برای «کتاب» بی‌نتیجه می‌ماند — دقیقاً شبیه «این شخص وجود ندارد». به همین دلیل ستون `Person.searchText` اضافه شد و در همهٔ مسیرهای نوشتن (ساخت، ویرایش، افزودن/حذف علاقه) همگام نگه داشته می‌شود. |
+| 2 | Calendar | ✅ **DONE** | `modules/birthdays/calendar.ts` `buildMonth`/`shiftMonth` · سرویس `getCalendarForUser` · `views/calendar.views.ts`. صفحه‌بندی **مطلق** (سال/ماه در callback) تا سه بار «بعدی» و یک بار «قبل» به جای اول برگردد. اسفند ۳۰ در سال کبیسه به ۲۹ منتقل می‌شود. |
+| 3 | Dashboard | ✅ **DONE** | `BirthdayBuckets` با سطل‌های امروز / این هفته (۱..۷) / بعداً (کاپ ۱۰) · «نزدیک‌ترین تولد» · «تعداد تولدهای این ماه» · `views/dashboard.views.ts`. `getTodayForUser` دیگر truncation ندارد و مرده نیست. |
+| 4 | Reminder customization | ✅ **DONE** | `reminder.service.ts` `setEnabled` — ۶ آفست مستقل برای هر شخص. |
+| 5 | Snooze | ✅ **DONE** | مدل `Snooze` + migration · `reminder.service.ts` `snooze`/`resolveSnoozeTarget`/`findDueSnoozes` · `callbacks/snooze.callbacks.ts`. **امنیت:** `deliveryId` در callback مخفی نیست، پس `findLogByIdForUser` مالکیت را بررسی می‌کند؛ آفست از callback قابل جعل است، پس فقط مقادیر `SNOOZE_OPTIONS` پذیرفته می‌شوند. **پایان اعتبار:** اگر یادآوریِ snooze از تولد عبور کند، به‌کاربر پیام `snooze.expired` فرستاده می‌شود (نه سکوت) و ردیف بسته می‌شود. |
+| 6 | Notification retry | ✅ **DONE** | `NotificationLog.status/attempts/nextAttemptAt/lastError/sentAt` · backoff نمایی با سقف در `reminders/retry.ts` (۵ دقیقه پایه، ۶ ساعت سقف، ۶ تلاش) · پاس‌های مجزای retry و snooze در `birthday-reminder.job.ts`. **رفع اشکال:** رفتار قبلی سطر لاگ را پاک می‌کرد، اما چون تطبیق تولد فقط در همان روز انجام می‌شود، یادآوری برای همیشه گم می‌شد. حالا سطر `pending` می‌ماند و پاس retry آن را تحویل می‌گیرد. |
+| 7 | Health check | ✅ **DONE** | `modules/health/health.service.ts` با پروب‌های جداگانه و محافظت‌شده · `Scheduler.isRunning()` · دستور `/health` (پشت `HEALTHCHECK_ENABLED`) · سه حالت مجزا `ok`/`degraded`/`down` — دیتابیسِ قطع یعنی `down` با پیام خودش، نه وعدهٔ «به‌زودی درست می‌کنم». |
+| 8 | تست کامل Featureهای جدید | ✅ **DONE** | ۲۹۱ تست واحد و ۹۱ تست integration. تست‌های جدید: `config/feature-flags`، `modules/retry`، `modules/health`، `modules/reminder.snooze`، `modules/birthday.dashboard`، `modules/birthday.search`، `modules/birthday.calendar` + ۱۰ تست integration برای تطبیق نرمال‌سازی جستجو (نام، علاقه‌مندی و یادداشت). |
+| 9 | Update README | ✅ **DONE** | README و پوشهٔ `docs/` به‌روزرسانی شدند؛ هر ۸ متغیر feature flag در `.env.example` مستند شده‌اند. |
 
-**امتیاز P1: (0 + 0 + 0.5 + 1 + 0 + 0.5 + 0 + 0 + 0.5) / 9 = 2.5/9 = 28%**
+**امتیاز P1: (1 × 9) / 9 = 100%**
 
 ---
 
@@ -339,60 +340,54 @@ Roadmap می‌خواهد: `GIFTS_ENABLED=false`، `GROUPS_ENABLED=false`، `AI_
 
 ---
 
-## ۷. برنامه اجرایی فاز P1 — قدم‌به‌قدم
+## ۷. برنامه اجرایی فاز P1 — اجراشده
 
-فاز P1 شش کار باقی‌مانده دارد. ترتیب زیر دلیل فنی دارد:
+هر هفت قدم زیر انجام شده‌اند. ترتیب اجرا دلیل فنی داشت (پرچم‌ها قبل از قابلیت‌ها تا رول‌اوت قابل کنترل باشد؛ `/health` به‌جای HTTP server از دستور بات استفاده کرد چون Roadmap §25 اضافه‌کردن dependency برای آماده‌بودنِ آینده را ممنوع می‌کند).
 
-### قدم ۱ — Feature Flag سیستم (پیش‌نیاز)
-**اول** باید ساخته شود چون Roadmap §17 صریحاً می‌گوید «از Phase 2 به اضافه شود» و بدون آن نمی‌توان Search/Calendar را پشت پرچم رول‌اوت کرد.
-- `config/feature-flags.ts` — رجیستری متمرکز، env-driven، با `.env.example` هم‌راستا
-- `test envFeatureFlags` — گره‌خوردن به `config/env.ts:14`
-- تست: روشن/خاموش بودن هر پرچم + رفتار پیش‌فرض
+### قدم ۱ — Feature Flag سیستم ✅
+- `config/feature-flags.ts` — رجیستری متمرکز، env-driven، هم‌راستا با `.env.example`
+- پارسر boolean به `trim`/`lowercase` مقاوم شد تا `TRUE` و `true` یکی باشند
+- تست: `tests/config/feature-flags.test.ts` (روشن/خاموش، پیش‌فرض، مقادیر نامعتبر)
 
-### قدم ۲ — Dashboard واقعی (بند ۳.1)
-- `birthday.service.ts:40` `getTodayForUser` را که dead code است **فعال** کن
-- متد `getThisWeekForUser` اضافه شود
-- `view/home.views.ts` با ساختار `🔴 امروز / 🟠 این هفته / 🟢 بعداً`
-- خطوط: نزدیک‌ترین تولد · تعداد این ماه · تعداد افراد (`countForUser` آماده است: `person.service.ts:84`)
-- تست: ۰/۱/چند تولد، مرزهای هفته و ماه جلالی
+### قدم ۲ — Dashboard واقعی (بند ۳.۱) ✅
+- `getTodayForUser` از حالت مرده درآمد و `getThisWeekForUser` اضافه شد
+- `BirthdayBuckets` با ساختار `🔴 امروز / 🟠 این هفته / 🟢 بعداً` (کاپ ۱۰)
+- خطوط: نزدیک‌ترین تولد · تعداد این ماه · تعداد کل
+- تست: `tests/modules/birthday.dashboard.test.ts` (۰/۱/چند تولد، مرزهای هفته و ماه جلالی)
 
-### قدم ۳ — Search (بند 3.3)
-- `person.repository.ts`: متد `searchForUser(userId, query)` — `contains` روی `name` **و** `notes` + `interests.some.title`
-- حساسیت به بزرگی/کوچکی حروف و نرمال‌سازی عربی/فارسی (ی/ک) — یک `shared/utils/text.ts` کمکی
-- حالت `mode: 'message'` (کاربر متن بفرستد) + دکمه `🔎 جستجوی افراد`
+### قدم ۳ — Search (بند ۳.۳) ✅
+- `person.repository.ts` `searchForUser(userId, query)` روی `name`، `notes` و عنوان علاقه‌ها
+- نرمال‌سازی عربی/فارسی و ارقام در `shared/utils/persian.ts`
+- **اصلاح معماری در حین اجرا:** نرمال‌کردنِ query به‌تنهایی کافی نبود، چون متن ذخیره‌شده نرمال نمی‌شد و جستجوی «كتاب» برای «کتاب» شکست می‌خورد. ستون `Person.searchText` اضافه و در همهٔ مسیرهای نوشتن همگام شد.
 - امنیت: `userId` در تمام کوئری‌ها اجباری
-- تست: یافته/نیافته · ایمنی بین‌کاربری · جستجو در علاقه و یادداشت
+- تست: `tests/modules/birthday.search.test.ts` + ۱۰ تست integration برای تطبیق نرمال‌سازی + `pnpm db:check-search-folding` که همسانیِ SQL و TS را تضمین می‌کند
 
-### قدم ۴ — Calendar (بند 3.2)
-- ماژول جدید `modules/calendar/` — `calendar.service.ts` + `calendar.repository.ts`
-- گروه‌بندی بر اساس `(month, day)` جلالی؛ `birthMonth`/`birthDay` از قبل ایندکس شده‌اند (`Person_userId_birthMonth_birthDay_idx`)
-- نمایش ماه جاری + ناوبری ماه قبل/بعد
-- توجه: `isValidJalaliDate` و `jalaliMonthLength` در `utils/date.ts:220,226` آماده‌اند
+### قدم ۴ — Calendar (بند ۳.۲) ✅
+- `modules/birthdays/calendar.ts` `buildMonth`/`shiftMonth` — به‌جای ماژول جدید، چون همه‌چیز از قبل در ماژول تولدها بود
+- نمایش ماه جاری + ناوبری ماه قبل/بعد با **صفحه‌بندی مطلق** (سال/ماه در callback) تا «بعدی» سه بار به اول برنگردد
+- اسفند ۳۰ در سال کبیسه به ۲۹ منتقل می‌شود
+- تست: `tests/modules/birthday.calendar.test.ts` (شامل اسفند ۳۰)
 
-### قدم ۵ — Snooze (بند 3.5) ⚠️ نیازمند تغییر اعلان
-پیش‌نیاز اجباری: اعلان فعلی **هیچ inline keyboard ندارد** (`job:79`).
-- `Person`/`Reminder` تغییر نمی‌کند — یک مدل `Snooze` لازم است
-- یا ساده‌تر: `NotificationLog` را با `snoozedTo DateTime?` گسترش دهید (کمترین مهاجرش)
-- کیبورد اعلان با گزینه‌های «فردا / ۳ روز بعد / هفته بعد» (Roadmap §3.5)
-- ⚠️ تصمیم معماری لازم است: آیا زمان اعلان مجدد از offset روزانه استفاده کند یا از offset یادآور شخص؟
+### قدم ۵ — Snooze (بند ۳.۵) ✅
+- **تصمیم معماری:** مدل `Snooze` مستقل، نه گسترش `NotificationLog`. دلیل: `NotificationLog` یکتایی «یک سطر برای هر شخص در هر بازه» دارد و چند تعویقِ هم‌زمانِ یک بازه را نمی‌توانست نگه دارد.
+- کیبورد اعلان با گزینه‌های ۱/۳/۷ روز
+- **امنیت:** `deliveryId` قابل حدس است، پس `findLogByIdForUser` مالکیت را بررسی می‌کند و `daysBefore` فقط از `SNOOZE_OPTIONS` پذیرفته می‌شود
+- **تاریخ‌گذاری مجدد:** تعداد روز در لحظهٔ ارسال از تقویم و منطقهٔ زمانی کاربر محاسبه می‌شود؛ تعویقی که از تولد بگذرد بسته می‌شود تا پیام «امروز تولد است» فردای تولد ارسال نشود. **پایان اعتبار اعلام می‌شود:** به‌جای سکوت، پیام `snooze.expired` برای کاربر فرستاده می‌شود (سکوت در باتی که کارش به‌یادآوردن است، شبیه باگ به نظر می‌رسد)، سپس ردیف بسته می‌شود
+- تست: `tests/modules/reminder.snooze.test.ts` + سناریوهای مالکیت در integration
 
-### قدم ۶ — Notification retry + Health check (بند 3.6)
-**Retry:** `Reminder` یا یک جدول `DeliveryAttempt` با `attempts Int`، `nextAttemptAt`، `lastError`
-- exponential backoff: ۱د · ۵د · ۱۵د · ۶۰د · سپس dead
-- `release` فعلی محل مناسب hook است (`reminder.service.ts:199`)
+### قدم ۶ — Notification retry + Health check (بند ۳.۶) ✅
+**Retry:** ستون‌های `status`/`attempts`/`nextAttemptAt`/`lastError`/`sentAt` روی `NotificationLog` + backoff نمایی در `reminders/retry.ts`
+- **رفع اشکال:** رفتار قبلی سطر لاگ را حذف می‌کرد؛ اما چون تطبیق تولد فقط در همان روز انجام می‌شود، یادآوری برای همیشه از دست می‌رفت. حالا سطر `pending` باقی می‌ماند و پاس retry آن را تحویل می‌گیرد.
+- `findHandledSlotKeys` همهٔ وضعیت‌ها را می‌بیند تا پاس تازه، سطر `pending` را دوباره ندزدد
+- **lease اتمیک:** پاس تازه با unique constraint محافظت می‌شود، اما retry ردیفی را دوباره می‌فرستد که از قبل وجود دارد. پس قبل از ارسال، ردیف با یک `UPDATE` شرطی اجاره می‌شود که `nextAttemptAt` را جلو می‌برد و همان شرط خواندن را تکرار می‌کند؛ نتیجه: دقیقاً یک کارگر برنده می‌شود و ردیف تا پایان مهلت از دید بقیه پنهان است
+- کاربر حذف‌شده پایان‌پذیر (`markFailed`) است، چون `NotificationLog.userId` cascade دارد و retry بی‌پایان می‌شد
 
-**Health check:** سه سطح
-- سطح ۱ — `/health` فرمان بات (بدون وابستگی جدید) + پاسخ `db.ping()` از Prisma
-- سطح ۲ — `healthcheck` در `docker-compose.yml` برای سرویس bot (الان فقط `db` دارد)
-- سطح ۳ — Metrics (اختیاری، بعداً)
-- ⚠️ توجه: افزودن HTTP server برای `/health` یک وابستگی جدید است و Roadmap §25 می‌گوید «صرفاً برای آماده‌بودن برای آینده dependency اضافه نکن» — به همین دلیل سطح ۱ پیشنهاد می‌شود.
+**Health check:** سطح ۱ — دستور `/health` با سه حالت مجزای `ok`/`degraded`/`down` و پشت `HEALTHCHECK_ENABLED`. سطح ۲ (healthcheck در compose) و ۳ (metrics) انجام نشده و برای بعدی‌اند.
 
-### قدم ۷ — پایان‌دهی
-- تست‌های جدید برای همهٔ موارد بالا (Roadmap §19: Unit / Integration / Bot Flow / Regression)
-- `pnpm validate` سبز
-- README + به‌روزرسانی همین سند
-
-**تخمین کل P1: ۶ تا ۹ روز کاری.**
+### قدم ۷ — پایان‌دهی ✅
+- ۲۹۱ تست واحد و ۹۱ تست integration
+- `pnpm test:all`، `pnpm build` و دروازه‌های typecheck/lint سبز
+- README، `.env.example` و همین سند به‌روزرسانی شدند
 
 ---
 
@@ -402,16 +397,18 @@ Roadmap می‌خواهد: `GIFTS_ENABLED=false`، `GROUPS_ENABLED=false`، `AI_
 |---|---|---|---|
 | 1 | **مسیر Docker فقط بازبینی ایستا** | 🔴 متوسط | Docker روی این ماشین نصب نیست. `Dockerfile` و `docker-compose.yml` تغییری نکرده‌اند ولی هرگز اجرا نشده‌اند. اولین باری که کسی این را deploy کند ممکن است مشکل پیدا کند |
 | 2 | نبود CI | 🟠 متوسط | `pnpm validate` و `pnpm validate:full` دستی هستند. با وجود داشتن تست Integration، کسی آن را خودکار اجرا نمی‌کند |
-| 3 | نبود backoff در retry | 🟠 متوسط | اعلان ازدست‌رفته تا تلاش بعدی (۶۰ ثانیه) از دست می‌رود؛ بعد از آن دیگر تلاش نمی‌شود |
-| 4 | نبود health check | 🟠 متوسط | خرابی DB یا scheduler از بیرون غیرقابل‌تشخیص است |
+| 3 | نبود backoff در retry | ✅ **رفع شد** | `reminders/retry.ts` با backoff نمایی، سقف ۶ ساعت و ۶ تلاش. سطر `pending` دیگر حذف نمی‌شود، پس یادآوری گم نمی‌شود |
+| 4 | نبود health check | ✅ **رفع شد** | دستور `/health` با سه حالت `ok`/`degraded`/`down` و پشت پرچم. سطح ۲ (compose healthcheck) و metrics هنوز باقی است |
 | 5 | ۱۸ فایل uncommitted | ✅ **رفع شد** | commit شد |
 | 6 | پوشه `docs/` وجود نداشت | ✅ **رفع شد** | `docs/logging.md` و `docs/ROADMAP-STATUS.md` ساخته شد |
 | 7 | `.gitattributes` غایب | ✅ **رفع شد** | هشدار CRLF حذف شد |
-| 8 | صفر تست Integration | ✅ **رفع شد** | ۶۹ تست روی دیتابیس واقعی |
+| 8 | صفر تست Integration | ✅ **رفع شد** | ۹۱ تست روی دیتابیس واقعی |
 | 9 | ۵ ماژول استاب غیرفعال | 🟡 کم | عمدی و مطابق §25 — ولی `Promise<never>` کد نوشته‌شده برای فازهای آینده است |
-| 10 | `getTodayForUser` استفاده‌نشده | 🟡 کم | dead code — یا استفاده شود (قدم ۲ فاز ۱) یا حذف |
+| 10 | `getTodayForUser` استفاده‌نشده | ✅ **رفع شد** | در سطل «امروز» داشبورد مصرف شد |
 | 11 | تست‌های `as never` / `as unknown as` | 🟡 کم | در `settings.handler.test.ts:83` — type safety در تست‌ها کم است. تست‌های Integration این مشکل را ندارند |
 | 12 | `package.json#prisma` deprecated | 🟡 کم | Prisma 7 آن را حذف می‌کند؛ باید به `prisma.config.ts` مهاجرت کرد |
+| 13 | retry بدون lease اتمیک | ✅ **رفع شد** | پاس retry و snooze قبل از ارسال، ردیف را با یک `UPDATE` شرطی اجاره می‌کنند (همان شرطی که خوانده شد، پس دقیقاً یک کارگر برنده می‌شود). ردیفِ اجاره‌شده تا پایان مهلت از کوئری سایر کارگرها پنهان است. ۴ تست integration با ۱۰ تماس هم‌زمان و ۲ تست race در سطح job |
+| 14 | شمارش معکوس snooze کهنه می‌شود | ✅ **رفع شد** | تعداد روز در لحظهٔ ارسال از تقویم و منطقهٔ زمانی کاربر محاسبه می‌شود، نه از offset ذخیره‌شده. تعویقِ گذشته از تولد به‌جای پیام اشتباه، با اعلام `snooze.expired` به کاربر بسته می‌شود |
 
 ---
 
@@ -433,9 +430,9 @@ Roadmap می‌خواهد: `GIFTS_ENABLED=false`، `GROUPS_ENABLED=false`، `AI_
 
 ```text
 کل Roadmap (P0 → P11)
-████████████████░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░  23%
+████████████████████████████████████░░░░  34%
   P0  MVP               ████████████████████  100%  ✅
-  P1  UX + Reliability   ██████░░░░░░░░░░░░░░   28%  🟡
+  P1  UX + Reliability   ████████████████████  100%  ✅
   P2  Gift System       ░░░░░░░░░░░░░░░░░░░░░░    0%  ⬜
   P3  AI                ░░░░░░░░░░░░░░░░░░░░░░    0%  ⬜
   P4  Groups            ░░░░░░░░░░░░░░░░░░░░░░    0%  ⬜
@@ -448,7 +445,7 @@ Roadmap می‌خواهد: `GIFTS_ENABLED=false`، `GROUPS_ENABLED=false`، `AI_
   P11 Scale             ░░░░░░░░░░░░░░░░░░░░░░    0%  ⬜
 
 فاصله تا MVP اولیه:  ✅ بسته شد (۵ از ۵ کار، فقط مسیر Docker اجرا نشد)
-فاصله تا اتمام P1:      72%  (۶ قدم باقی‌مانده، ۶–۹ روز کاری)
+فاصله تا اتمام P1:      ✅ بسته شد (۹ از ۹ بند؛ ۳۸۰ تست، ۰ خطا)
 ```
 
 ### روش محاسبه
@@ -471,18 +468,18 @@ Roadmap می‌خواهد: `GIFTS_ENABLED=false`، `GROUPS_ENABLED=false`، `AI_
 
 | بند | وضعیت |
 |---|---|
-| Featureها کامل باشند | ✅ برای P0 · ❌ برای P1 |
-| Edge Caseها بررسی شده باشند | ✅ (۲۴ تست `birthday.calc` شامل sweep ۴۰۰ روزه؛ Esfand 30؛ سال نامعلوم) |
-| Tests نوشته شده باشند | ✅ ۲۶۹ تست (۲۰۰ یونیت + ۶۹ یکپارچه روی دیتابیس واقعی) |
+| Featureها کامل باشند | ✅ برای P0 و P1 |
+| Edge Caseها بررسی شده باشند | ✅ (۲۴ تست `birthday.calc` شامل sweep ۴۰۰ روزه؛ Esfand 30؛ سال نامعلوم · کاربر حذف‌شده · اسفند ۳۰ · مالکیت snooze) |
+| Tests نوشته شده باشند | ✅ ۳۸۲ تست (۲۹۱ یونیت + ۹۱ یکپارچه روی دیتابیس واقعی) |
 | Tests قبلی Pass باشند | ✅ ۱۰۰٪ |
-| Database migration انجام شده باشد | ✅ ۱ migration · ۶ جدول · ۱۳ index · روی دیتابیس تست هم اجرا و تأیید شد |
+| Database migration انجام شده باشد | ✅ ۳ migration · جدول‌های `NotificationLog`/`Snooze` و ستون `Person.searchText` · روی دیتابیس تست هم اجرا و تأیید شد |
 | Security بررسی شده باشد | 🟡 input validation با Zod ✅ · ownership checks ✅ · redaction ✅ · rate limiting ❌ (طبق Roadmap بعد از MVP) |
 | Error handling وجود داشته باشد | ✅ `AppError` hierarchy + `bot.catch` + middleware |
 | Logging مناسب | ✅ pino ساختاریافته با redaction · سیاست مستند در `docs/logging.md` |
-| Documentation به‌روز باشد | ✅ README + `docs/logging.md` + همین سند |
-| Feature flag تنظیم شده باشد | ❌ سیستم Flag وجود ندارد |
-| UI کامل باشد | ✅ برای P0 |
-| Feature نصفه در UI نشان داده نشود | ✅ (ماژول‌های غیرفعال اصلاً به UI نرسیده‌اند) |
+| Documentation به‌روز باشد | ✅ README + `docs/logging.md` + `.env.example` + همین سند |
+| Feature flag تنظیم شده باشد | ✅ `config/feature-flags.ts` با ۸ پرچم، همه در `.env.example` مستند |
+| UI کامل باشد | ✅ برای P0 و P1 |
+| Feature نصفه در UI نشان داده نشود | ✅ پرچم خاموش = نه دکمه، نه فرمان، نه مسیر callback |
 
 ---
 
@@ -490,7 +487,8 @@ Roadmap می‌خواهد: `GIFTS_ENABLED=false`، `GROUPS_ENABLED=false`، `AI_
 
 طبق قانون اصلی Roadmap (§22) — `User Value → Usage → Validation → Complexity`:
 
-1. **انجام شد:** پنج کار پایانی بسته شد و `v0.1.0` آمادهٔ برچسب‌گذاری است. تنها کاری که باقی مانده اجرای واقعی مسیر Docker روی یک ماشین با Docker است.
-2. **بعد:** CI اضافه کن که `pnpm validate:full` را اجرا کند. الان ۶۹ تست Integration وجود دارد ولی هیچ‌کس خودکار اجرایشان نمی‌کند.
-3. **بعد از آن:** فقط Phase 1 را شروع کن، دقیقاً به ترتیب قدم ۱ تا ۷ بخش ۷. `Search` و `Calendar` بیشترین ارزش کاربر را دارند؛ `Snooze` و `Health check` بیشترین ارزش عملیاتی را.
-4. **توقف:** تا دیدن رفتار کاربر واقعی، وارد Phase 2+ نشو.
+1. **انجام شد:** فازهای P0 و P1 بسته شدند و `v0.2.0` آمادهٔ برچسب‌گذاری است. ۳۸۲ تست، typecheck، lint و build همگی سبز. ممیزی خط‌به‌خط §۳٫۱–۳٫۷ انجام شد و هر ۹ بند Definition of Done تأیید شد.
+2. **تنها کار باقی‌مانده در P1:** اجرای واقعی مسیر Docker روی یک ماشین با Docker — Docker روی این ماشین نصب نیست.
+3. **بعد:** CI اضافه کن که `pnpm validate:full` را اجرا کند. الان ۹۱ تست Integration وجود دارد ولی هیچ‌کس خودکار اجرایشان نمی‌کند.
+4. **ریسک‌های باز P1:** هیچ‌کدام. دو ریسکی که در نسخهٔ قبلی این سند ثبت شده بود (lease اتمیک retry و شمارش معکوس stale در snooze) در بخش ۸ رفع شده‌اند.
+5. **توقف:** تا دیدن رفتار کاربر واقعی، وارد Phase 2+ نشو.

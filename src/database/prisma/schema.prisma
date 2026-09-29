@@ -27,6 +27,7 @@ model User {
   people           Person[]
   reminders        Reminder[]
   notificationLogs NotificationLog[]
+  snoozes          Snooze[]
   flowStates       UserFlowState[]
 
   @@index([createdAt])
@@ -44,6 +45,13 @@ model Person {
   /// Original birth year in the Jalali calendar, only when the user provided it.
   birthYear  Int?
   notes      String?
+  /// §3.3 - normalized name + notes + interests, kept in sync on every write.
+  ///
+  /// Search has to compare a folded query against folded stored text: an Arabic
+  /// keyboard produces ي/ك where Persian expects ی/ک, and ZWNJ comes and goes.
+  /// Normalizing only the query would miss "كتاب" for a person stored as
+  /// "کتاب", so both sides are canonicalised on write and matched as one column.
+  searchText String @default("")
   deletedAt  DateTime?
   createdAt  DateTime  @default(now())
   updatedAt  DateTime  @updatedAt
@@ -52,6 +60,7 @@ model Person {
   interests        Interest[]
   reminders        Reminder[]
   notificationLogs NotificationLog[]
+  snoozes          Snooze[]
 
   @@index([userId, deletedAt])
   @@index([userId, name])
@@ -91,16 +100,32 @@ model Reminder {
   @@index([personId, enabled])
 }
 
-/// Lightweight send-log that guarantees a reminder is never delivered twice.
-/// The unique constraint is the race-condition guard for concurrent scheduler runs.
+/// Delivery state for one notification slot.
+///
+/// The unique constraint is still the race-condition guard for concurrent
+/// scheduler runs, but a row now means "this slot is being handled", not
+/// "this slot was delivered". That distinction is what makes a retry possible:
+/// a failed send keeps the row as `pending` with a `nextAttemptAt`, instead of
+/// deleting it and losing the reminder (§3.6).
 model NotificationLog {
-  id            String   @id @default(cuid())
-  userId        String
-  personId      String
+  id           String @id @default(cuid())
+  userId       String
+  personId     String
   /// Jalali year of the birthday occurrence this notification belongs to.
-  birthdayYear  Int
-  daysBefore    Int
-  sentAt        DateTime @default(now())
+  birthdayYear Int
+  daysBefore   Int
+  /// `pending` claimed or awaiting retry · `sent` delivered · `failed` gave up.
+  status       String   @default("pending")
+  /// How many delivery attempts have been made, including the current one.
+  attempts     Int      @default(1)
+  /// When the retry pass may pick this row up again.
+  nextAttemptAt DateTime @default(now())
+  /// Last failure, truncated. Diagnostics only — never shown as a user message.
+  lastError    String?
+  /// Set when `status` becomes `sent`.
+  sentAt       DateTime?
+  createdAt    DateTime  @default(now())
+  updatedAt    DateTime  @updatedAt
 
   user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
   person Person @relation(fields: [personId], references: [id], onDelete: Cascade)
@@ -108,6 +133,40 @@ model NotificationLog {
   @@unique([userId, personId, birthdayYear, daysBefore])
   @@index([userId, sentAt])
   @@index([personId, birthdayYear])
+  /// Drives the retry pass: pending rows whose backoff has elapsed.
+  @@index([status, nextAttemptAt])
+}
+
+/// §3.5 — a reminder the user postponed from the notification keyboard.
+///
+/// Created when the user taps «⏰ یادآوری دوباره». The original notification
+/// slot is released, so this row — not the log — is what the delivery job
+/// consumes for the postponed message.
+model Snooze {
+  id            String   @id @default(cuid())
+  userId        String
+  personId      String
+  /// The occurrence and offset of the notification being postponed.
+  birthdayYear  Int
+  daysBefore    Int
+  /// Earliest moment the postponed notification may be delivered.
+  deliverAt     DateTime
+  /// `pending` waiting or retrying · `sent` delivered · `failed` gave up.
+  status        String   @default("pending")
+  attempts      Int      @default(0)
+  nextAttemptAt DateTime @default(now())
+  lastError     String?
+  sentAt        DateTime?
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+  person Person @relation(fields: [personId], references: [id], onDelete: Cascade)
+
+  /// One snooze per notification slot: re-snoozing updates the existing row.
+  @@unique([userId, personId, birthdayYear, daysBefore])
+  @@index([status, nextAttemptAt])
+  @@index([userId, status])
 }
 
 /// Conversation state for multi-step Telegram flows.

@@ -21,6 +21,7 @@ import {
   timezoneKeyboard,
 } from '../../src/bot/keyboards/settings.js';
 import { welcomeKeyboard } from '../../src/bot/keyboards/start.js';
+import { allFlagsOn } from '../helpers/feature-flags.js';
 import type { UserSettings } from '../../src/modules/settings/settings.repository.js';
 import type { ReminderRecord } from '../../src/modules/reminders/reminder.types.js';
 import type { InterestRecord, PersonWithReminders } from '../../src/modules/people/person.types.js';
@@ -95,8 +96,8 @@ function labels(keyboard: unknown): string[] {
 }
 
 const KEYBOARDS: [string, unknown][] = [
-  ['welcomeKeyboard (deep link)', welcomeKeyboard('yadetteBot')],
-  ['welcomeKeyboard (no username)', welcomeKeyboard(undefined)],
+  ['welcomeKeyboard (deep link)', welcomeKeyboard({ username: 'yadetteBot', lang: 'fa', flags: allFlagsOn() })],
+  ['welcomeKeyboard (no username)', welcomeKeyboard({ username: undefined, lang: 'fa', flags: allFlagsOn() })],
   ['personDetailsKeyboard (with interests)', personDetailsKeyboard(personId, 'fa', true)],
   ['personDetailsKeyboard (without interests)', personDetailsKeyboard(personId, 'fa', false)],
   ['personEditKeyboard', personEditKeyboard(personId)],

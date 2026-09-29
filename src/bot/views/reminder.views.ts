@@ -1,6 +1,6 @@
 import { t, type Language } from '../../shared/i18n/index.js';
 import { escapeHtml, truncate } from '../../shared/utils/text.js';
-import { formatJalali, toPersianDigits } from '../../shared/utils/date.js';
+import { formatJalali, toPersianDigits, type JalaliDate } from '../../shared/utils/date.js';
 import { reminderLabel } from '../../modules/reminders/reminder.service.js';
 import type { ReminderRecord } from '../../modules/reminders/reminder.types.js';
 import type { DueNotification } from '../../modules/reminders/reminder.service.js';
@@ -26,11 +26,20 @@ export function reminderSettingsText(
   return parts.join('\n');
 }
 
-/** §20 — the actual reminder message. Static template copy, no AI. */
-export function reminderNotificationText(due: DueNotification, lang: Language): string {
-  const { person, occurrence, daysBefore } = due;
+/**
+ * §20 — the actual reminder message. Static template copy, no AI.
+ *
+ * Takes a narrowed input rather than `DueNotification`: a snoozed delivery has
+ * no occurrence of its own, only the birthday it belongs to, and the two must
+ * render identically.
+ */
+export function reminderNotificationText(
+  due: ReminderMessageInput,
+  lang: Language,
+): string {
+  const { person, jalali, jalaliYear, daysBefore } = due;
   const name = escapeHtml(truncate(person.name, 60));
-  const date = formatJalali(occurrence.jalali.jm, occurrence.jalali.jd);
+  const date = formatJalali(jalali.jm, jalali.jd);
 
   if (daysBefore === 0) {
     return [t('notification.today', lang, { name }), '', t('notification.todayBody', lang)].join('\n');
@@ -38,7 +47,7 @@ export function reminderNotificationText(due: DueNotification, lang: Language): 
 
   const age = ageOnBirthday(
     { month: person.birthMonth, day: person.birthDay, year: person.birthYear },
-    occurrence.jalaliYear,
+    jalaliYear,
   );
 
   const parts: string[] = [t('notification.upcoming', lang, { name }), ''];
@@ -62,4 +71,25 @@ export function reminderNotificationText(due: DueNotification, lang: Language): 
 
   parts.push('', t('notification.footer', lang));
   return parts.join('\n');
+}
+
+/** Everything a reminder message needs, independent of how delivery found it. */
+export interface ReminderMessageInput {
+  person: DueNotification['person'];
+  /** The resolved birthday this message is about. */
+  jalali: JalaliDate;
+  jalaliYear: number;
+  daysBefore: number;
+}
+
+/**
+ * §3.5 — the postponed notification.
+ *
+ * Identical wording on purpose: a snoozed delivery is the same reminder, late.
+ */
+export function snoozeNotificationText(
+  due: Pick<ReminderMessageInput, 'person' | 'jalali' | 'jalaliYear' | 'daysBefore'>,
+  lang: Language,
+): string {
+  return reminderNotificationText(due, lang);
 }

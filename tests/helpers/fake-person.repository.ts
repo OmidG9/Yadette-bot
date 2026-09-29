@@ -1,3 +1,8 @@
+import {
+  buildSearchText,
+  MIN_SEARCH_LENGTH,
+  normalizePersian,
+} from '../../src/shared/utils/persian.js';
 import type {
   CreatePersonInput,
   InterestRecord,
@@ -40,6 +45,20 @@ export class FakePersonRepository implements PersonRepository {
         updatedAt: new Date(),
       })),
     };
+  }
+
+  /**
+   * The same blob the real `searchText` column holds.
+   *
+   * The fake rebuilds it on every read rather than storing it, which is only
+   * equivalent because the real repository also recomputes it on every write.
+   */
+  private searchTextOf(person: PersonWithReminders): string {
+    return buildSearchText([
+      person.name,
+      person.notes,
+      ...person.interests.map((interest) => interest.title),
+    ]);
   }
 
   async create(input: CreatePersonInput): Promise<PersonWithReminders> {
@@ -90,6 +109,21 @@ export class FakePersonRepository implements PersonRepository {
 
   async countForUser(userId: string): Promise<number> {
     return (await this.findAllForUser(userId)).length;
+  }
+
+  /** Mirrors the real query: folded query against the folded stored blob. */
+  async searchForUser(
+    userId: string,
+    query: string,
+    limit = 20,
+  ): Promise<PersonWithReminders[]> {
+    const needle = normalizePersian(query);
+    if (needle.length < MIN_SEARCH_LENGTH) return [];
+
+    return (await this.findAllForUser(userId))
+      .filter((person) => this.searchTextOf(person).includes(needle))
+      .sort((a, b) => a.name.localeCompare(b.name))
+      .slice(0, limit);
   }
 
   async addInterests(personId: string, titles: string[]): Promise<InterestRecord[]> {

@@ -54,6 +54,17 @@ export class Scheduler {
     logger.info({ event: 'scheduler.stopped' }, 'scheduler stopped');
   }
 
+  /**
+   * §3.6 — whether the loop is live.
+   *
+   * Reported by the health check, because a scheduler that stopped ticking
+   * looks exactly like a healthy bot to a user: messages still work, no
+   * reminders ever arrive.
+   */
+  isRunning(): boolean {
+    return !this.stopped;
+  }
+
   /** Runs every task once, awaited — used on startup and in tests. */
   async runOnce(): Promise<void> {
     for (const task of this.tasks) {

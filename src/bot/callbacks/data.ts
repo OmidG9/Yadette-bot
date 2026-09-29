@@ -3,6 +3,9 @@ import { z } from 'zod';
 const idSchema = z.string().regex(/^[A-Za-z0-9_-]{1,64}$/);
 const daysSchema = z.coerce.number().int().min(0).max(365);
 const timezoneSchema = z.string().min(1).max(64).regex(/^[A-Za-z_+\-/0-9]+$/);
+/** Jalali year, bounded to a range no human will leave. */
+const jalaliYearSchema = z.coerce.number().int().min(1300).max(1500);
+const jalaliMonthSchema = z.coerce.number().int().min(1).max(12);
 
 /**
  * Validated shape of any callback payload.
@@ -13,14 +16,29 @@ const RawCallbackSchema = z
     kind: z.string().min(1).max(48),
     personId: idSchema.optional(),
     interestId: idSchema.optional(),
+    deliveryId: idSchema.optional(),
     days: daysSchema.optional(),
+    year: jalaliYearSchema.optional(),
+    month: jalaliMonthSchema.optional(),
     timezone: timezoneSchema.optional(),
   })
   .strict();
 
 export type CallbackData = z.infer<typeof RawCallbackSchema>;
 
-const NAV_TARGETS = ['menu', 'upcoming', 'people', 'settings', 'help', 'add', 'about'] as const;
+const NAV_TARGETS = [
+  'menu',
+  'upcoming',
+  'people',
+  'settings',
+  'help',
+  'add',
+  'about',
+  'dashboard',
+  'search',
+  'calendar',
+  'health',
+] as const;
 
 const PERSON_ACTIONS = [
   'view',
@@ -104,6 +122,12 @@ function toCandidate(raw: string): Record<string, unknown> {
       // settings:data:<ask|yes|no> — a two-step destructive confirmation.
       if (a === 'data') return { kind: `settings:data:${b ?? 'ask'}` };
       return { kind: `settings:${a ?? ''}` };
+    case 'cal':
+      // cal:<jalaliYear>:<jalaliMonth> — absolute, so paging back and forth works.
+      return { kind: 'cal:month', year: a, month: b };
+    case 'snz':
+      // snz:ask:<deliveryId> | snz:do:<deliveryId>:<days>
+      return a === 'do' ? { kind: 'snooze:do', deliveryId: b, days: c } : { kind: 'snooze:ask', deliveryId: b };
     default:
       return { kind: head ?? '' };
   }
@@ -133,7 +157,10 @@ export function parseCallbackData(raw: string | undefined): CallbackData | null 
     (data.kind.startsWith(SETTINGS_PREFIX) &&
       isOneOf(data.kind.slice(SETTINGS_PREFIX.length), SETTINGS_ACTIONS) &&
       data.kind !== `${SETTINGS_PREFIX}tz:set`) ||
-    (data.kind === `${SETTINGS_PREFIX}tz:set` && data.timezone !== undefined);
+    (data.kind === `${SETTINGS_PREFIX}tz:set` && data.timezone !== undefined) ||
+    (data.kind === 'cal:month' && data.year !== undefined && data.month !== undefined) ||
+    (data.kind === 'snooze:ask' && data.deliveryId !== undefined) ||
+    (data.kind === 'snooze:do' && data.deliveryId !== undefined && data.days !== undefined);
 
   return isKnown ? data : null;
 }
@@ -156,8 +183,30 @@ export const timezoneCallback = (timezone: string): string => `settings:tz:set:$
 export const deleteDataCallback = (action: 'ask' | 'yes' | 'no'): string => `settings:data:${action}`;
 
 export const navCallback = (
-  target: 'menu' | 'upcoming' | 'people' | 'settings' | 'help' | 'add' | 'about',
+  target:
+    | 'menu'
+    | 'upcoming'
+    | 'people'
+    | 'settings'
+    | 'help'
+    | 'add'
+    | 'about'
+    | 'dashboard'
+    | 'search'
+    | 'calendar'
+    | 'health',
 ): string => `nav:${target}`;
+
+/** `cal:<year>:<month>` — an absolute Jalali month, so paging is stateless. */
+export const calendarMonthCallback = (year: number, month: number): string =>
+  `cal:${year}:${String(month).padStart(2, '0')}`;
+
+/** `snz:ask:<deliveryId>` — the snooze submenu. */
+export const snoozeAskCallback = (deliveryId: string): string => `snz:ask:${deliveryId}`;
+
+/** `snz:do:<deliveryId>:<days>` — confirm a snooze of `days`. */
+export const snoozeDoCallback = (deliveryId: string, days: number): string =>
+  `snz:do:${deliveryId}:${days}`;
 
 export const saveAddPersonCallback = (): string => 'flow:person:save';
 

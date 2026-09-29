@@ -4,6 +4,7 @@ import { welcomeText } from '../views/menu.views.js';
 import { welcomeKeyboard, START_ADD_PAYLOAD } from '../keyboards/start.js';
 import { startAddPerson } from '../conversations/add-person.js';
 import { t } from '../../shared/i18n/index.js';
+import { featureFlags } from '../../config/feature-flags.js';
 import type { Services } from '../../container.js';
 import type { FlowStore } from '../conversations/flow.store.js';
 
@@ -35,7 +36,7 @@ export async function handleStart(ctx: AppContext, deps: StartDeps): Promise<voi
   const username = ctx.me.username;
   const body = username ? text : `${text}\n\n${t('start.ctaFallback', lang)}`;
 
-  await sendText(ctx, body, welcomeKeyboard(username, lang));
+  await sendText(ctx, body, welcomeKeyboard({ username, lang, flags: featureFlags }));
 
   // The reply keyboard is sticky in the client, so it is only installed on the
   // very first contact; later `/start` presses keep the chat to a single message.

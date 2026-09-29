@@ -58,6 +58,12 @@ export interface PersonRepository {
   softDelete(personId: string, userId: string): Promise<boolean>;
   countForUser(userId: string): Promise<number>;
 
+  /**
+   * §3.3 — match a normalized query against name, interests and notes.
+   * Implementations normalize the query; callers pass the raw user input.
+   */
+  searchForUser(userId: string, query: string, limit?: number): Promise<PersonWithReminders[]>;
+
   addInterests(personId: string, titles: string[]): Promise<InterestRecord[]>;
   removeInterest(interestId: string, personId: string): Promise<boolean>;
   replaceInterests(personId: string, titles: string[]): Promise<InterestRecord[]>;

@@ -1,6 +1,7 @@
 import { afterAll, beforeEach, describe, expect, it } from 'vitest';
 
 import { notificationSlotKey } from '../../src/modules/reminders/reminder.types.js';
+import { RETRY_LEASE_MS } from '../../src/modules/reminders/retry.js';
 import {
   db,
   disconnectTestDatabase,
@@ -31,7 +32,11 @@ describe('PrismaReminderRepository (real database)', () => {
       expect(claimed).not.toBeNull();
       expect(claimed?.daysBefore).toBe(0);
       expect(claimed?.birthdayYear).toBe(1405);
-      expect(claimed?.sentAt).toBeInstanceOf(Date);
+      // A claim is an intent to send, not a delivery: §3.6 leaves it `pending`
+      // and only `markSent` stamps `sentAt`.
+      expect(claimed?.status).toBe('pending');
+      expect(claimed?.attempts).toBe(1);
+      expect(claimed?.sentAt).toBeNull();
     });
 
     it('returns null when the same slot is claimed again', async () => {
@@ -79,34 +84,234 @@ describe('PrismaReminderRepository (real database)', () => {
       expect(await reminders.claimNotification({ ...base, birthdayYear: 1405 })).not.toBeNull();
     });
 
-    it('releaseNotification frees the slot for the next tick', async () => {
+    /**
+     * §3.6 — a failed delivery keeps its claim and becomes a retry.
+     *
+     * The replaced behaviour deleted the row, which freed the slot but also
+     * destroyed the record that the reminder still had to be sent.
+     */
+    it('keeps a failed slot and schedules it for retry', async () => {
       const user = await seedUser(users);
       const person = await seedPerson(persons, user.id);
       const slot = { userId: user.id, personId: person.id, birthdayYear: 1405, daysBefore: 1 };
 
-      const first = await reminders.claimNotification(slot);
-      expect(first).not.toBeNull();
+      const claimed = await reminders.claimNotification(slot);
+      expect(claimed).not.toBeNull();
+      expect(claimed!.status).toBe('pending');
 
-      await reminders.releaseNotification(first!.id);
+      const nextAttemptAt = new Date(Date.now() + 300_000);
+      await reminders.scheduleRetry(claimed!.id, 1, nextAttemptAt, 'telegram 502');
 
-      expect(
-        await reminders.findLog(slot.userId, slot.personId, slot.birthdayYear, slot.daysBefore),
-      ).toBeNull();
-      expect(await reminders.claimNotification(slot)).not.toBeNull();
+      const log = await reminders.findLog(slot.userId, slot.personId, slot.birthdayYear, slot.daysBefore);
+      expect(log).not.toBeNull();
+      expect(log!.status).toBe('pending');
+      expect(log!.attempts).toBe(1);
+      expect(log!.lastError).toBe('telegram 502');
+      // Still claimed: a concurrent run must not be able to double-send.
+      expect(await reminders.claimNotification(slot)).toBeNull();
     });
 
-    it('releaseNotification is idempotent for an unknown id', async () => {
-      await expect(reminders.releaseNotification('does-not-exist')).resolves.toBeUndefined();
+    /** The claim stops blocking once the send succeeded. */
+    it('marks a delivered slot as sent', async () => {
+      const user = await seedUser(users);
+      const person = await seedPerson(persons, user.id);
+      const slot = { userId: user.id, personId: person.id, birthdayYear: 1405, daysBefore: 1 };
+
+      const claimed = await reminders.claimNotification(slot);
+      const sentAt = new Date('2026-10-09T06:00:00.000Z');
+      await reminders.markSent(claimed!.id, sentAt);
+
+      const log = await reminders.findLog(slot.userId, slot.personId, slot.birthdayYear, slot.daysBefore);
+      expect(log!.status).toBe('sent');
+      expect(log!.sentAt).toEqual(sentAt);
+    });
+
+    it('reports a claimed slot as handled even while it is still pending', async () => {
+      const user = await seedUser(users);
+      const person = await seedPerson(persons, user.id);
+      const slot = { userId: user.id, personId: person.id, birthdayYear: 1405, daysBefore: 1 };
+
+      const claimed = await reminders.claimNotification(slot);
+      // A pending row is a delivery in flight that the retry pass owns. The
+      // fresh pass must skip it, or it would re-claim the slot every tick.
+      expect((await reminders.findHandledSlotKeys(user.id)).size).toBe(1);
+
+      await reminders.markSent(claimed!.id, new Date());
+      expect((await reminders.findHandledSlotKeys(user.id)).size).toBe(1);
+    });
+
+    it('finds only the retries whose backoff has elapsed', async () => {
+      const user = await seedUser(users);
+      const person = await seedPerson(persons, user.id);
+      const now = new Date('2026-10-09T06:00:00.000Z');
+
+      const due = await reminders.claimNotification({
+        userId: user.id, personId: person.id, birthdayYear: 1405, daysBefore: 0,
+      });
+      const waiting = await reminders.claimNotification({
+        userId: user.id, personId: person.id, birthdayYear: 1405, daysBefore: 7,
+      });
+
+      await reminders.scheduleRetry(due!.id, 1, new Date(now.getTime() - 1000), 'boom');
+      await reminders.scheduleRetry(waiting!.id, 1, new Date(now.getTime() + 60_000), 'boom');
+
+      const retries = await reminders.findDueRetries(now, 10);
+      expect(retries).toHaveLength(1);
+      expect(retries[0]!.log.id).toBe(due!.id);
+      // The join has to carry the name, or a retry cannot render itself.
+      expect(retries[0]!.person.name).not.toBe('');
+    });
+
+    /**
+     * The fresh pass leans on a unique constraint; a retry cannot, because the
+     * row it re-sends already exists. These prove the lease closes that hole in
+     * the database itself, not just in the fake.
+     */
+    describe('leaseRetry', () => {
+      async function pendingSlot(daysBefore = 0): Promise<{
+        logId: string;
+        now: Date;
+      }> {
+        const user = await seedUser(users);
+        const person = await seedPerson(persons, user.id);
+        const log = await reminders.claimNotification({
+          userId: user.id, personId: person.id, birthdayYear: 1405, daysBefore,
+        });
+        const now = new Date('2026-10-09T06:00:00.000Z');
+        await reminders.scheduleRetry(log!.id, 1, new Date(now.getTime() - 1000), 'boom');
+        return { logId: log!.id, now };
+      }
+
+      it('lets exactly one of ten concurrent workers lease the same retry', async () => {
+        const { logId, now } = await pendingSlot();
+
+        const results = await Promise.all(
+          Array.from({ length: 10 }, () => reminders.leaseRetry(logId, now)),
+        );
+
+        expect(results.filter(Boolean)).toHaveLength(1);
+      });
+
+      it('hides the leased row from the next worker’s due query', async () => {
+        const { logId, now } = await pendingSlot();
+        expect(await reminders.findDueRetries(now, 10)).toHaveLength(1);
+
+        expect(await reminders.leaseRetry(logId, now)).toBe(true);
+
+        // This is what makes the lease work: the row is gone from the query
+        // that another worker uses to find work, not merely flagged in memory.
+        expect(await reminders.findDueRetries(now, 10)).toHaveLength(0);
+      });
+
+      it('releases the row again once the lease has elapsed', async () => {
+        const { logId, now } = await pendingSlot();
+        await reminders.leaseRetry(logId, now);
+
+        // A crashed worker must not strand the notification forever.
+        const afterLease = new Date(now.getTime() + RETRY_LEASE_MS + 1000);
+        expect(await reminders.findDueRetries(afterLease, 10)).toHaveLength(1);
+        expect(await reminders.leaseRetry(logId, afterLease)).toBe(true);
+      });
+
+      it('refuses to lease a row that is no longer pending', async () => {
+        const { logId, now } = await pendingSlot();
+        await reminders.markSent(logId, now);
+
+        expect(await reminders.leaseRetry(logId, now)).toBe(false);
+      });
+    });
+
+    it('never returns another user’s log to a snooze button', async () => {
+      const owner = await seedUser(users);
+      const stranger = await seedUser(users);
+      const person = await seedPerson(persons, owner.id);
+
+      const claimed = await reminders.claimNotification({
+        userId: owner.id, personId: person.id, birthdayYear: 1405, daysBefore: 0,
+      });
+
+      expect(await reminders.findLogByIdForUser(claimed!.id, owner.id)).not.toBeNull();
+      expect(await reminders.findLogByIdForUser(claimed!.id, stranger.id)).toBeNull();
+    });
+
+    it('ignores an unknown log id', async () => {
+      const user = await seedUser(users);
+      expect(await reminders.findLogByIdForUser('does-not-exist', user.id)).toBeNull();
     });
   });
 
-  describe('findLogKeys', () => {
-    it('returns an empty set when nothing was sent', async () => {
+  describe('snooze', () => {
+    it('replaces a pending snooze instead of stacking a second one', async () => {
       const user = await seedUser(users);
-      expect(await reminders.findLogKeys(user.id)).toEqual(new Set());
+      const person = await seedPerson(persons, user.id);
+      const slot = { userId: user.id, personId: person.id, birthdayYear: 1405, daysBefore: 0 };
+
+      const first = await reminders.upsertSnooze({ ...slot, deliverAt: new Date('2026-10-10T00:00:00.000Z') });
+      const second = await reminders.upsertSnooze({ ...slot, deliverAt: new Date('2026-10-12T00:00:00.000Z') });
+
+      expect(second.id).toBe(first.id);
+      expect(second.deliverAt).toEqual(new Date('2026-10-12T00:00:00.000Z'));
+      expect(await db.snooze.count({ where: { userId: user.id } })).toBe(1);
     });
 
-    it('groups every sent slot into the same key format as wasSent', async () => {
+    it('resets the attempt budget when a snooze is changed', async () => {
+      const user = await seedUser(users);
+      const person = await seedPerson(persons, user.id);
+      const slot = { userId: user.id, personId: person.id, birthdayYear: 1405, daysBefore: 0 };
+
+      const snooze = await reminders.upsertSnooze({ ...slot, deliverAt: new Date('2026-10-10T00:00:00.000Z') });
+      await reminders.scheduleSnoozeRetry(snooze.id, 3, new Date('2026-10-10T06:00:00.000Z'), 'telegram 502');
+
+      // The previous failure was about the old delivery time; changing the
+      // delay is a new decision and deserves a full budget again.
+      const again = await reminders.upsertSnooze({ ...slot, deliverAt: new Date('2026-10-11T00:00:00.000Z') });
+      expect(again.attempts).toBe(0);
+      expect(again.status).toBe('pending');
+      expect(again.lastError).toBeNull();
+    });
+
+    it('returns due snoozes with the person attached', async () => {
+      const user = await seedUser(users);
+      const person = await seedPerson(persons, user.id);
+      const now = new Date('2026-10-09T06:00:00.000Z');
+
+      await reminders.upsertSnooze({
+        userId: user.id, personId: person.id, birthdayYear: 1405, daysBefore: 0,
+        deliverAt: new Date(now.getTime() - 1000),
+      });
+
+      const due = await reminders.findDueSnoozes(now, 10);
+      expect(due).toHaveLength(1);
+      expect(due[0]!.person.id).toBe(person.id);
+    });
+
+    it('lets exactly one worker lease the same snooze', async () => {
+      const user = await seedUser(users);
+      const person = await seedPerson(persons, user.id);
+      const now = new Date('2026-10-09T06:00:00.000Z');
+
+      const snooze = await reminders.upsertSnooze({
+        userId: user.id, personId: person.id, birthdayYear: 1405, daysBefore: 0,
+        deliverAt: new Date(now.getTime() - 1000),
+      });
+
+      const results = await Promise.all(
+        Array.from({ length: 10 }, () => reminders.leaseSnooze(snooze.id, now)),
+      );
+
+      expect(results.filter(Boolean)).toHaveLength(1);
+      // And the row is out of the next worker's way, same as a retry.
+      expect(await reminders.findDueSnoozes(now, 10)).toHaveLength(0);
+    });
+  });
+
+  describe('findHandledSlotKeys', () => {
+    it('returns an empty set when nothing was ever claimed', async () => {
+      const user = await seedUser(users);
+      expect(await reminders.findHandledSlotKeys(user.id)).toEqual(new Set());
+    });
+
+    it('uses the same key format as wasSent', async () => {
       const user = await seedUser(users);
       const person = await seedPerson(persons, user.id);
 
@@ -117,7 +322,7 @@ describe('PrismaReminderRepository (real database)', () => {
         daysBefore: 7,
       });
 
-      const keys = await reminders.findLogKeys(user.id);
+      const keys = await reminders.findHandledSlotKeys(user.id);
       expect(keys).toEqual(new Set([notificationSlotKey(person.id, 1405, 7)]));
     });
 
@@ -133,7 +338,7 @@ describe('PrismaReminderRepository (real database)', () => {
         daysBefore: 0,
       });
 
-      expect(await reminders.findLogKeys(second.id)).toEqual(new Set());
+      expect(await reminders.findHandledSlotKeys(second.id)).toEqual(new Set());
     });
   });
 

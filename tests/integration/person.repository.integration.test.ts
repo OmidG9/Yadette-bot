@@ -77,6 +77,116 @@ describe('PrismaPersonRepository (real database)', () => {
     });
   });
 
+  /**
+   * §3.3 - search has to work whichever keyboard the text was typed on.
+   *
+   * These are the cases that were silently broken: the query is folded but the
+   * stored text was not, so an Arabic-spelled query missed a Persian-spelled
+   * person. To the user that looks exactly like the person not existing, which
+   * is the worst possible failure for a "find someone to buy a gift for" flow.
+   */
+  describe('searchForUser — folding', () => {
+    it('finds a Persian spelling with an Arabic keyboard query', async () => {
+      const user = await seedUser(users);
+      await seedPerson(persons, user.id, { name: 'کتاب‌فروشی' });
+
+      const found = await persons.searchForUser(user.id, 'كتاب');
+
+      expect(found.map((person) => person.name)).toEqual(['کتاب‌فروشی']);
+    });
+
+    it('finds an Arabic spelling with a Persian keyboard query', async () => {
+      const user = await seedUser(users);
+      await seedPerson(persons, user.id, { name: 'یاسمن' });
+
+      const found = await persons.searchForUser(user.id, 'ياسمن');
+
+      expect(found.map((person) => person.name)).toEqual(['یاسمن']);
+    });
+
+    it('ignores harakat the user happened to type', async () => {
+      const user = await seedUser(users);
+      await seedPerson(persons, user.id, { name: 'مُحَمَّد' });
+
+      const found = await persons.searchForUser(user.id, 'محمد');
+
+      expect(found).toHaveLength(1);
+    });
+
+    it('matches an interest typed in the other script', async () => {
+      const user = await seedUser(users);
+      await seedPerson(persons, user.id, { name: 'سارا', interests: ['کتاب'] });
+
+      const found = await persons.searchForUser(user.id, 'كتاب');
+
+      expect(found.map((person) => person.name)).toEqual(['سارا']);
+    });
+
+    it('matches a word from the notes typed in the other script', async () => {
+      const user = await seedUser(users);
+      await seedPerson(persons, user.id, { name: 'سارا', notes: 'کتاب‌فروشی محله' });
+
+      // §3.3 names notes as a search field; the blob has to fold them too, or a
+      // note is only findable with the exact keyboard the user happened to use.
+      const found = await persons.searchForUser(user.id, 'كتاب');
+
+      expect(found.map((person) => person.name)).toEqual(['سارا']);
+    });
+
+    it('keeps the blob in step when only the note is edited', async () => {
+      const user = await seedUser(users);
+      const person = await seedPerson(persons, user.id, { name: 'سارا', notes: 'یادداشت قدیمی' });
+
+      await persons.update(person.id, user.id, { notes: 'یادداشت تازه' });
+
+      expect(await persons.searchForUser(user.id, 'تازه')).toHaveLength(1);
+      expect(await persons.searchForUser(user.id, 'قدیمی')).toHaveLength(0);
+    });
+
+    it('keeps the blob in step when the name is edited', async () => {
+      const user = await seedUser(users);
+      const person = await seedPerson(persons, user.id, { name: 'اسم قدیمی' });
+
+      await persons.update(person.id, user.id, { name: 'اسم تازه' });
+
+      expect(await persons.searchForUser(user.id, 'تازه')).toHaveLength(1);
+      // The old name must not linger, or the person is findable by a name the
+      // user has already replaced.
+      expect(await persons.searchForUser(user.id, 'قدیمی')).toHaveLength(0);
+    });
+
+    it('drops an interest from the blob when it is removed', async () => {
+      const user = await seedUser(users);
+      const person = await seedPerson(persons, user.id, { name: 'سارا', interests: ['شطرنج'] });
+      const stored = await persons.findByIdForUser(person.id, user.id);
+      const interest = stored!.interests[0]!;
+
+      expect(await persons.searchForUser(user.id, 'شطرنج')).toHaveLength(1);
+      await persons.removeInterest(interest.id, person.id);
+
+      expect(await persons.searchForUser(user.id, 'شطرنج')).toHaveLength(0);
+      // The name is still searchable: the rebuild must not wipe the other fields.
+      expect(await persons.searchForUser(user.id, 'سارا')).toHaveLength(1);
+    });
+
+    it('rebuilds the blob when the interests are replaced', async () => {
+      const user = await seedUser(users);
+      const person = await seedPerson(persons, user.id, { name: 'سارا', interests: ['قدیمی'] });
+
+      await persons.replaceInterests(person.id, ['تازه']);
+
+      expect(await persons.searchForUser(user.id, 'تازه')).toHaveLength(1);
+      expect(await persons.searchForUser(user.id, 'قدیمی')).toHaveLength(0);
+    });
+
+    it('returns nothing for a one-character query', async () => {
+      const user = await seedUser(users);
+      await seedPerson(persons, user.id, { name: 'علی' });
+
+      expect(await persons.searchForUser(user.id, 'ع')).toHaveLength(0);
+    });
+  });
+
   describe('findByIdForUser — ownership', () => {
     it('returns the person for its owner', async () => {
       const user = await seedUser(users);

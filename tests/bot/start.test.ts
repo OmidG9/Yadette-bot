@@ -3,6 +3,7 @@ import { welcomeText, helpText } from '../../src/bot/views/menu.views.js';
 import { welcomeKeyboard, START_ADD_PAYLOAD } from '../../src/bot/keyboards/start.js';
 import { mainMenuLabels, mainMenuKeyboard } from '../../src/bot/keyboards/main.js';
 import { parseCallbackData } from '../../src/bot/callbacks/data.js';
+import { allFlagsOn, flagsExcept } from '../helpers/feature-flags.js';
 import type { UserRecord } from '../../src/modules/users/user.types.js';
 
 function user(overrides: Partial<UserRecord> = {}): UserRecord {
@@ -56,26 +57,51 @@ describe('first-run welcome', () => {
 });
 
 describe('welcome call to action', () => {
+  const menu = (
+    username: string | undefined,
+    flags = allFlagsOn(),
+  ): { text: string; callback_data?: string; url?: string }[][] =>
+    welcomeKeyboard({ username, lang: 'fa', flags }).inline_keyboard;
+
   it('builds a deep link into the add-person flow', () => {
-    const button = welcomeKeyboard('Yadett_bot').inline_keyboard[0]?.[0];
+    const button = menu('Yadett_bot')[0]?.[0];
     expect(button).toMatchObject({ url: `https://t.me/Yadett_bot?start=${START_ADD_PAYLOAD}` });
   });
 
   it('falls back to an internal callback without a bot username', () => {
-    const button = welcomeKeyboard(undefined).inline_keyboard[0]?.[0];
+    const button = menu(undefined)[0]?.[0];
     expect(button).toMatchObject({ callback_data: 'nav:add' });
   });
 
-  it('offers a tappable button for every section', () => {
-    const rows = welcomeKeyboard('Yadett_bot').inline_keyboard;
-    expect(rows).toHaveLength(3);
+  it('offers a tappable button for every enabled section', () => {
+    const rows = menu('Yadett_bot');
     expect(rows.flat().map((button) => button.text)).toEqual([
       '➕ اضافه کردن اولین نفر',
+      '🏠 خانه',
       '🎂 تولدها',
+      '🔎 جستجو',
+      '📅 تقویم',
       '⚙️ تنظیمات',
       'ℹ️ راهنما',
       '📖 درباره‌ی یادته',
     ]);
+  });
+
+  /**
+   * Regression risk the roadmap calls out in §17: a section that is switched
+   * off must not leave a button behind. A dead button is a promise the bot
+   * cannot keep.
+   */
+  it('omits a section whose feature flag is off', () => {
+    const rows = menu('Yadett_bot', flagsExcept('search', 'calendar', 'dashboard'))
+      .flat()
+      .map((button) => button.text);
+
+    expect(rows).not.toContain('🔎 جستجو');
+    expect(rows).not.toContain('📅 تقویم');
+    expect(rows).not.toContain('🏠 خانه');
+    // Settings is not behind a flag and must survive.
+    expect(rows).toContain('⚙️ تنظیمات');
   });
 
   /**
@@ -84,7 +110,7 @@ describe('welcome call to action', () => {
    */
   it('only emits callbacks the dispatcher understands', () => {
     for (const username of ['Yadett_bot', undefined]) {
-      for (const row of welcomeKeyboard(username).inline_keyboard) {
+      for (const row of menu(username)) {
         for (const button of row) {
           if (!('callback_data' in button)) continue;
           expect(parseCallbackData(button.callback_data), button.callback_data).not.toBeNull();

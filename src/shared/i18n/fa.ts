@@ -26,13 +26,15 @@ export const fa = {
     delete: '🗑 حذف',
     back: '🔙 بازگشت',
     home: '🏠 منوی اصلی',
+    close: '✖️ بستن',
   },
   /** Shown in the Telegram command menu, so they stay short. */
   commands: {
-    start: 'شروع / خوش‌آمد',
-    about: 'درباره‌ی یادته',
+    start: 'شروع',
+    about: 'دربارهٔ بات',
     help: 'راهنما',
-    cancel: 'لغو کار نیمه‌کاره',
+    cancel: 'لغو عملیات',
+    health: 'وضعیت بات',
   },
   /** The single hint that tells a user how to leave any step. */
   hint: {
@@ -70,6 +72,10 @@ export const fa = {
     home: '🏠 منوی اصلی',
     help: 'ℹ️ راهنما',
     about: '📖 درباره‌ی یادته',
+    /** Phase 1 sections. */
+    dashboard: '🏠 خانه',
+    search: '🔎 جستجو',
+    calendar: '📅 تقویم',
   },
   start: {
     /** First contact: what it does, what it stores, one obvious next step. */
@@ -255,6 +261,73 @@ export const fa = {
     inDays: '{{count}} روز دیگه',
     /** Just the number and the unit, for sentences that supply their own verb. */
     daysCount: '{{count}} روز',
+  },
+
+  /** §3.1 — the home screen. */
+  dashboard: {
+    title: '🎂 <b>تولدهای نزدیک</b>',
+    todayHeading: '🔴 امروز',
+    weekHeading: '🟠 این هفته',
+    laterHeading: '🟢 بعداً',
+    emptyToday: 'امروز تولد کسی نیست 🙂',
+    emptyWeek: 'این هفته هم تولدی نداریم.',
+    emptyLater: 'تولد دیگه‌ای در پیش نیست.',
+    /** No people at all: a different message, because the buckets are moot. */
+    noneAtAll: 'هنوز کسی ثبت نکردی.\n\nاز «➕ افزودن شخص» شروع کن 🙂',
+    item: '• <b>{{name}}</b> · 📅 {{date}}{{age}}',
+    ageSuffix: ' · {{age}} سال',
+    /** The three numbers the roadmap asks for above the buckets. */
+    summary: '👥 {{people}} نفر ثبت شده · 🎂 {{monthCount}} تولد در {{monthName}}',
+    nextUp: '⏳ نزدیک‌ترین تولد: <b>{{name}}</b> · {{countdown}}',
+  },
+  search: {
+    title: '🔎 <b>جستجوی افراد</b>',
+    prompt: 'اسم، علاقه‌مندی یا کلمه‌ای از یادداشت رو بنویس.\n\n💡 مثلاً: <b>فوتبال</b>، <b>مادر</b>، <b>قهوه</b>',
+    resultsTitle: '🔎 نتیجه برای «<b>{{query}}</b>»',
+    resultsCount: '{{count}} نفر پیدا شد.',
+    item: '• <b>{{name}}</b> · 🎂 {{date}} · ⏳ {{countdown}}',
+    empty: 'کسی با «{{query}}» پیدا نشد.\n\n💡 یه چیز دیگه امتحان کن، یا اگه مطمئنی این شخص رو ثبت نکردی، همین‌جا اضافه‌اش کن.',
+    tooShort: '🔍 یه کم بیشتر بنویس — حداقل {{min}} حرف.',
+    hint: '💡 جستجو توی اسم، علاقه‌مندی‌ها و یادداشت‌ها انجام می‌شه.',
+  },
+  calendar: {
+    title: '📅 <b>تقویم تولدها</b>',
+    monthHeading: '<b>{{monthName}} {{year}}</b>',
+    /** One line per day that has a birthday. */
+    day: '📆 {{day}} {{monthName}} — {{names}}',
+    empty: 'این ماه تولدی ثبت نشده 🙂',
+    otherMonths: '👀 بقیه‌ی ماه‌ها',
+    prevMonth: '◀️ ماه قبل',
+    nextMonth: 'ماه بعد ▶️',
+    legend: '💡 فقط تولدهای همین ماه رو می‌بینی. برای بقیه از «🎂 تولدها» استفاده کن.',
+    thisMonth: '📅 همین ماه',
+  },
+  snooze: {
+    title: '⏰ یادآوری دوباره',
+    prompt: 'کِی یادآوریت کنم؟',
+    tomorrow: '⏰ فردا یادآوری کن',
+    inDays: '{{count}} روز دیگه یادآوری کن',
+    done: '⏰ باشه، یادت میارم — {{when}}.',
+    expired: 'این یادآوری دیگه اعتبار نداره. تولد بعدی رو از «🎂 تولدها» ببین 🙂',
+    alreadySnoozed: 'این یادآوری قبلاً تنظیم شده.',
+  },
+  health: {
+    title: '🩺 <b>وضعیت بات</b>',
+    ok: '✅ همه‌چیز سالمه.',
+    database: '🗄 دیتابیس: {{value}}',
+    reachable: 'متصل',
+    unreachable: 'قطع — {{value}}',
+    reminders: '⏰ یادآوری‌ها: {{value}}',
+    schedulerUp: 'در حال اجرا',
+    schedulerDown: 'متوقف',
+    /** Shown when a probe fails; keeps the user out of the technical detail. */
+    degraded: '⚠️ یه مشکلی هست. به‌زودی درستش می‌کنم.',
+    /**
+     * The database is unreachable, so no birthday can be stored or read. This is
+     * deliberately distinct from `degraded`: promising a quick fix here would be
+     * a lie, and the user may be about to miss a birthday.
+     */
+    down: '❌ بات الان نمی‌تونه کار کنه. لطفاً کمی بعد دوباره سر بزن.',
   },
 } as const;
 

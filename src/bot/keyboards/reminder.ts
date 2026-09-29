@@ -1,5 +1,6 @@
 import { InlineKeyboard } from 'grammy';
 import { t, type Language } from '../../shared/i18n/index.js';
+import { toPersianDigits } from '../../shared/utils/date.js';
 import {
   addInterestCallback,
   flowBackCallback,
@@ -10,9 +11,12 @@ import {
   reminderPendingCallback,
   reminderToggleCallback,
   saveAddPersonCallback,
+  snoozeAskCallback,
+  snoozeDoCallback,
 } from '../callbacks/data.js';
 import { ALLOWED_REMINDER_DAYS } from '../../shared/constants/index.js';
 import { reminderLabel } from '../../modules/reminders/reminder.service.js';
+import { SNOOZE_OPTIONS } from '../../modules/reminders/snooze.js';
 import type { ReminderRecord } from '../../modules/reminders/reminder.types.js';
 import type { InterestRecord } from '../../modules/people/person.types.js';
 
@@ -21,6 +25,36 @@ import type { InterestRecord } from '../../modules/people/person.types.js';
 const CANCEL_DATA = navCallback('menu');
 const BACK_DATA = flowBackCallback();
 const NEXT_DATA = flowNextCallback();
+
+/**
+ * §3.5 — the snooze button on a delivered reminder.
+ *
+ * Carries the notification log id, which is what makes the button refer to one
+ * specific delivery rather than to "the last reminder", which would be wrong
+ * the moment a user has two.
+ */
+export function snoozeKeyboard(logId: string, lang: Language = 'fa'): InlineKeyboard {
+  return new InlineKeyboard()
+    .text(t('snooze.title', lang), snoozeAskCallback(logId))
+    .row()
+    .text(t('buttons.close'), navCallback('menu'));
+}
+
+/** The offset chooser shown after tapping the snooze button. */
+export function snoozeOptionsKeyboard(logId: string, lang: Language = 'fa'): InlineKeyboard {
+  const keyboard = new InlineKeyboard();
+
+  for (const days of SNOOZE_OPTIONS) {
+    keyboard.text(
+      days === 1
+        ? t('snooze.tomorrow', lang)
+        : t('snooze.inDays', lang, { count: toPersianDigits(days) }),
+      snoozeDoCallback(logId, days),
+    );
+  }
+
+  return keyboard.row().text(t('buttons.close'), navCallback('menu'));
+}
 
 /** Reminder toggles for a saved person (§14). */
 export function reminderKeyboard(

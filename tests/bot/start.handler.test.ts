@@ -48,7 +48,10 @@ describe('/start end to end', () => {
       .inline_keyboard;
     expect(rows.flat().map((button) => button.text)).toEqual([
       '➕ اضافه کردن اولین نفر',
+      '🏠 خانه',
       '🎂 تولدها',
+      '🔎 جستجو',
+      '📅 تقویم',
       '⚙️ تنظیمات',
       'ℹ️ راهنما',
       '📖 درباره‌ی یادته',

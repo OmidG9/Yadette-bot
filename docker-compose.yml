@@ -39,6 +39,17 @@ services:
       DEFAULT_LANGUAGE: ${DEFAULT_LANGUAGE:-fa}
       REMINDER_CHECK_INTERVAL_MS: ${REMINDER_CHECK_INTERVAL_MS:-60000}
       LOG_LEVEL: ${LOG_LEVEL:-info}
+      # Feature flags are read from the environment, and an env var only reaches
+      # the container if it is listed here. Without these lines a
+      # `SEARCH_ENABLED=false` in .env would silently have no effect in Docker.
+      DASHBOARD_ENABLED: ${DASHBOARD_ENABLED:-true}
+      SEARCH_ENABLED: ${SEARCH_ENABLED:-true}
+      CALENDAR_ENABLED: ${CALENDAR_ENABLED:-true}
+      SNOOZE_ENABLED: ${SNOOZE_ENABLED:-true}
+      HEALTHCHECK_ENABLED: ${HEALTHCHECK_ENABLED:-true}
+      GIFTS_ENABLED: ${GIFTS_ENABLED:-false}
+      GROUPS_ENABLED: ${GROUPS_ENABLED:-false}
+      AI_ENABLED: ${AI_ENABLED:-false}
     depends_on:
       db:
         condition: service_healthy

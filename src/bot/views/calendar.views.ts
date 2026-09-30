@@ -4,6 +4,7 @@ import { calendarMonthCallback, navCallback } from '../callbacks/data.js';
 import { escapeHtml, truncate } from '../../shared/utils/text.js';
 import { toPersianDigits, type JalaliDate } from '../../shared/utils/date.js';
 import { monthName, shiftMonth, type BirthdayMonth } from '../../modules/birthdays/calendar.js';
+import { featureFlags, type FeatureFlags } from '../../config/feature-flags.js';
 
 /** §3.2 — one Jalali month, listed day by day. */
 export function calendarText(month: BirthdayMonth, lang: Language): string {
@@ -39,18 +40,25 @@ export function calendarText(month: BirthdayMonth, lang: Language): string {
  *
  * The current month gets a shortcut button, and paging back stops at the
  * current month: a birthday calendar has no use for the year the user was born.
+ *
+ * The shortcut points at the dashboard, which is behind its own flag and can be
+ * off while the calendar is on. A flag is checked where the UI is built, so the
+ * button disappears with it rather than answering "invalid input" when tapped.
  */
 export function calendarKeyboard(
   month: BirthdayMonth,
   today: JalaliDate,
   lang: Language,
+  flags: FeatureFlags = featureFlags,
 ): InlineKeyboard {
   const keyboard = new InlineKeyboard();
   const previous = shiftMonth(month.jalaliYear, month.jalaliMonth, -1);
   const isCurrentMonth = month.jalaliYear === today.jy && month.jalaliMonth === today.jm;
 
   if (isCurrentMonth) {
-    keyboard.text(t('calendar.thisMonth', lang), navCallback('dashboard'));
+    if (flags.isEnabled('dashboard')) {
+      keyboard.text(t('calendar.thisMonth', lang), navCallback('dashboard'));
+    }
   } else {
     keyboard.text(
       t('calendar.prevMonth', lang),

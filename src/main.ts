@@ -9,6 +9,7 @@ import { healthText } from './modules/health/health.service.js';
 import { BirthdayReminderJob } from './jobs/birthday-reminder.job.js';
 import { logger } from './shared/logger/index.js';
 import { toError } from './shared/errors/index.js';
+import { installShutdownHandlers } from './shared/lifecycle/shutdown.js';
 import { t } from './shared/i18n/index.js';
 
 async function main(): Promise<void> {
@@ -71,37 +72,36 @@ async function main(): Promise<void> {
     });
   }
 
-  await bot.start({ onStart: (info) => logger.info({ event: 'bot.started', username: info.username }, 'polling started') });
+  // Installed before `bot.start()`, which long-polls and therefore never
+  // resolves while the bot is healthy. Handlers registered after that `await`
+  // would be unreachable for the whole life of the process, so a `docker compose
+  // stop` would kill the bot outright instead of draining it.
+  installShutdownHandlers({
+    logger,
+    onShutdown: async (reason) => {
+      logger.info({ event: 'app.shutdown', reason }, 'shutting down');
 
-  let shuttingDown = false;
-  const shutdown = async (signal: string): Promise<void> => {
-    if (shuttingDown) return;
-    shuttingDown = true;
+      scheduler.stop();
+      await bot.stop().catch((error: unknown) => {
+        logger.warn({ event: 'bot.stop.failed', err: toError(error) }, 'bot stop failed');
+      });
+      await disconnectDatabase().catch((error: unknown) => {
+        logger.warn({ event: 'db.disconnect.failed', err: toError(error) }, 'db disconnect failed');
+      });
 
-    logger.info({ event: 'app.shutdown', signal }, 'shutting down');
-
-    scheduler.stop();
-    await bot.stop().catch((error: unknown) => {
-      logger.warn({ event: 'bot.stop.failed', err: toError(error) }, 'bot stop failed');
-    });
-    await disconnectDatabase().catch((error: unknown) => {
-      logger.warn({ event: 'db.disconnect.failed', err: toError(error) }, 'db disconnect failed');
-    });
-
-    process.exit(0);
-  };
-
-  process.on('SIGINT', () => void shutdown('SIGINT'));
-  process.on('SIGTERM', () => void shutdown('SIGTERM'));
-
-  process.on('unhandledRejection', (reason) => {
-    logger.error({ event: 'process.unhandledRejection', err: toError(reason) }, 'unhandled rejection');
+      process.exit(0);
+    },
   });
 
-  process.on('uncaughtException', (error) => {
-    logger.fatal({ event: 'process.uncaughtException', err: error }, 'uncaught exception');
-    void shutdown('uncaughtException');
+  // Resolves only once polling stops, which is what the handlers above do — so
+  // this await parks here for the healthy life of the process, then returns after
+  // a shutdown. If it ever rejects, `main().catch` reports it and exits 1.
+  await bot.start({
+    onStart: (info) =>
+      logger.info({ event: 'bot.started', username: info.username }, 'polling started'),
   });
+
+  logger.info({ event: 'bot.stopped' }, 'long polling finished');
 }
 
 main().catch((error: unknown) => {

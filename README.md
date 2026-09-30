@@ -28,6 +28,8 @@ docker compose up -d --build
 
 compose سه سرویس دارد: `db` (PostgreSQL 16 با healthcheck)، `migrate` (یک‌بار `prisma migrate deploy` می‌زند و تمام می‌شود) و `bot` که بعد از موفقیت migration بالا می‌آید. ایمیج چندمرحله‌ای است: build، migrate، prod-deps و runtime؛ در runtime فقط dev dependencyها حذف شده‌اند، کاربر `node` است و `tini` برای مدیریت سیگنال‌ها استفاده می‌شود.
 
+هشت feature flag در `.env` قابل تنظیم‌اند و همگی صریحاً به سرویس `bot` پاس داده می‌شوند — compose فقط متغیرهایی را که در بخش `environment` نوشته شده‌اند به کانتینر می‌برد. `docker compose down` و `docker stop` سیگنال `SIGTERM` می‌فرستند و ربات قبل از خروج زمان‌بند را متوقف و اتصال دیتابیس را می‌بندد.
+
 ## متغیرهای محیطی
 
 | متغیر | پیش‌فرض | توضیح |
@@ -106,6 +108,10 @@ createdb -U yadette yadette_test
 
 قبل از هر اجرا، migrationها روی این دیتابیس اعمال و جدول‌ها خالی می‌شوند. اگر `TEST_DATABASE_URL` و `DATABASE_URL` یک نام داشته باشند، اجرا **قبل از هر تغییری متوقف می‌شود** تا داده‌های واقعی پاک نشوند.
 
+**Bot Flow:** `tests/bot/bot-flow.test.ts` آپدیت واقعی تلگرام را از `bot.handleUpdate` عبور می‌دهد (با fetch جعلی به‌جای شبکه)، پس مسیر واقعی از دکمه تا handler و دیتابیس تست می‌شود.
+
+**در CI:** `.github/workflows/validate.yml` روی هر push و PR کل `pnpm validate:full` را با یک PostgreSQL سرویس اجرا می‌کند.
+
 ## نکته ویندوز
 
 `pnpm build` یک `prisma generate` اجرا می‌کند که باید فایل `query_engine-*.dll.node` را جابه‌جا کند. اگر `pnpm dev` هم‌زمان در حال اجرا باشد، ویندوز فایل را قفل نگه می‌دارد و بیلد با `EPERM ... rename` شکست می‌خورد. راه‌حل: `pnpm dev` را متوقف کن، بعد `pnpm build` را اجرا کن.
@@ -122,4 +128,4 @@ createdb -U yadette yadette_test
 
 ماژول‌های `gifts`، `groups`، `wishlist`، `messages` و `ai` به‌صورت غیرفعال رزرو شده‌اند. برای مقیاس افقی، `Scheduler` و `BirthdayReminderJob` طوری نوشته شده‌اند که جایگزینی با BullMQ فقط تغییر محل اجرا باشد.
 
-فاز بعدی **فاز ۱ (تجربه کاربری و پایداری)** است: Feature Flag، داشبورد تولدهای نزدیک، جستجو، تقویم، Snooze و Health Check. وضعیت دقیق و برنامهٔ اجرایی در [`docs/ROADMAP-STATUS.md`](docs/ROADMAP-STATUS.md).
+فاز ۱ (تجربه کاربری و پایداری) کامل است: Feature Flag، داشبورد تولدهای نزدیک، جستجو، تقویم، Snooze و Health Check. طبق قانون Roadmap، تا دیدن رفتار واقعی کاربر وارد فاز ۲ نمی‌شویم. وضعیت دقیق در [`docs/ROADMAP-STATUS.md`](docs/ROADMAP-STATUS.md).

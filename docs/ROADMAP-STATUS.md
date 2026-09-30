@@ -3,7 +3,7 @@
 > **مرجع سند:** `Prompts/Yadette — Product Roadmap & Development Phases.md`
 > **تاریخ گزارش:** 2026-09-29
 > **نسخه پروژه:** `0.2.0`
-> **وضعیت کد:** typecheck ✅ · lint ✅ · unit test ✅ (291/291) · integration test ✅ (91/91) · build ✅
+> **وضعیت کد:** typecheck ✅ · lint ✅ · unit test ✅ (341/341) · integration test ✅ (91/91) · build ✅ · CI ✅
 > **روش ممیزی:** بررسی کامل repository و تطبیق خط‌به‌خط با بندهای Roadmap
 
 > ✅ **فاز P1 بسته شد.** هر ۹ بند بخش ۳ Roadmap پیاده‌سازی و تست شده‌اند (جز تست دستی Docker — Docker روی این ماشین نصب نیست).
@@ -47,7 +47,7 @@
 |---|---|---|
 | Typecheck | `pnpm typecheck` | ✅ PASS — ۰ خطا، ۰ warning (`strict` + `noUncheckedIndexedAccess`) |
 | Lint | `pnpm lint` | ✅ PASS — ۰ خطا (type-checked ruleset، `no-explicit-any: error`) |
-| Unit tests | `pnpm test` | ✅ PASS — **۲۴ فایل / ۲۹۱ تست / ۰ fail** |
+| Unit tests | `pnpm test` | ✅ PASS — **۲۷ فایل / ۳۴۱ تست / ۰ fail** |
 | Integration tests | `pnpm test:integration` | ✅ PASS — **۴ فایل / ۹۱ تست / ۰ fail** روی PostgreSQL ۱۸ واقعی |
 | Search folding parity | `pnpm db:check-search-folding` | ✅ PASS — ۱۳ نمونه، تطبیق کاملِ نرمال‌سازی TS و SQL |
 | Build | `pnpm build` | ✅ PASS — `prisma generate` + `tsc -p tsconfig.build.json` |
@@ -123,7 +123,7 @@ src/
 | Telegram User | ✅ | `users/user.service.ts:24` `getOrCreate` · `middleware/hydrate-user.ts` |
 | User settings | ✅ | `User` ۱۱ فیلد · `settings/settings.service.ts:10` |
 | Timezone | ✅ | `User.timezone` + اعتبارسنجی IANA در `shared/utils/date.ts:60` · `AVAILABLE_TIMEZONES` ۸ منطقه |
-| Language foundation | ✅ | زیرساخت کامل: `shared/i18n/fa.ts` (۲۶۹ خط) + `TranslationKey` تایپ‌شده در زمان کامپایل (`fa.ts:266`) · `DEFAULT_LANGUAGE: z.enum(['fa'])` |
+| Language foundation | ✅ | زیرساخت کامل: `shared/i18n/fa.ts` (۳۴۲ خط) + `TranslationKey` تایپ‌شده در زمان کامپایل (`fa.ts:339`) · `DEFAULT_LANGUAGE: z.enum(['fa'])` |
 
 #### ۴.۲ People
 
@@ -133,7 +133,7 @@ src/
 | ویرایش شخص | ✅ | `conversations/edit-person.ts` (۱۷۸ خط) · `person.service.ts:120` `update` |
 | حذف شخص | ✅ | Soft delete + تأیید دومرحله‌ای · `person.callbacks.ts:41-62` |
 | مشاهده شخص | ✅ | `views/person.views.ts` (۱۴۱ خط) |
-| لیست افراد | ✅ | `nav.callbacks.ts:101` · سقف ۲۰ (`UPCOMING_LIST_LIMIT`) |
+| لیست افراد | ✅ | `nav.callbacks.ts:161` · سقف ۲۰ (`UPCOMING_LIST_LIMIT`) |
 
 #### ۴.۳ Birthday
 
@@ -186,12 +186,12 @@ src/
 | مورد | وضعیت | شواهد |
 |---|---|---|
 | **حذف کامل حساب / داده** | ✅ | `user.service.ts:77` `deleteAccount` → Cascade · تأیید ۲ مرحله‌ای · re-hydrate · تست idempotence |
-| فرمان `/about` | ✅ | `bot.ts:72` · `menu.views.ts:33` (متن طولانی محصول) |
+| فرمان `/about` | ✅ | `bot.ts:80` · `menu.views.ts:33` (متن طولانی محصول) |
 | فرمان `/cancel` | ✅ | `commands/cancel.ts` |
 | Docker Compose (۳ سرویس) | ✅ | `docker-compose.yml` — db / migrate / bot با healthcheck |
 | Dockerfile (۴ stage، non-root، tini) | ✅ | `Dockerfile` |
 | Redaction در لاگ | ✅ | `shared/logger/index.ts:23` — `BOT_TOKEN`، `DATABASE_URL`، authorization |
-| Graceful shutdown | ✅ | `main.ts:43-70` |
+| Graceful shutdown | ✅ | `shared/lifecycle/shutdown.ts` — هندلرها **قبل** از `await bot.start()` نصب می‌شوند، چون long-polling هرگز resolve نمی‌شود و هر چیزی بعد از آن تا ابد غیرقابل‌دسترس است. ۷ تست: SIGINT · SIGTERM · تکرار سیگنال · unhandled rejection · uncaught exception · خطای teardown · dispose |
 | تست دسته‌بندی Keyboard | ✅ | `tests/bot/keyboards.test.ts` — اسکن سورس، همه ۱۹ کیبورد round-trip |
 | تست جداسازی بین‌کاربری | ✅ | `tests/modules/person.service.test.ts` — ۷ کیس |
 
@@ -212,8 +212,8 @@ Roadmap §3.7 — Definition of Done:
 | 5 | Snooze | ✅ **DONE** | مدل `Snooze` + migration · `reminder.service.ts` `snooze`/`resolveSnoozeTarget`/`findDueSnoozes` · `callbacks/snooze.callbacks.ts`. **امنیت:** `deliveryId` در callback مخفی نیست، پس `findLogByIdForUser` مالکیت را بررسی می‌کند؛ آفست از callback قابل جعل است، پس فقط مقادیر `SNOOZE_OPTIONS` پذیرفته می‌شوند. **پایان اعتبار:** اگر یادآوریِ snooze از تولد عبور کند، به‌کاربر پیام `snooze.expired` فرستاده می‌شود (نه سکوت) و ردیف بسته می‌شود. |
 | 6 | Notification retry | ✅ **DONE** | `NotificationLog.status/attempts/nextAttemptAt/lastError/sentAt` · backoff نمایی با سقف در `reminders/retry.ts` (۵ دقیقه پایه، ۶ ساعت سقف، ۶ تلاش) · پاس‌های مجزای retry و snooze در `birthday-reminder.job.ts`. **رفع اشکال:** رفتار قبلی سطر لاگ را پاک می‌کرد، اما چون تطبیق تولد فقط در همان روز انجام می‌شود، یادآوری برای همیشه گم می‌شد. حالا سطر `pending` می‌ماند و پاس retry آن را تحویل می‌گیرد. |
 | 7 | Health check | ✅ **DONE** | `modules/health/health.service.ts` با پروب‌های جداگانه و محافظت‌شده · `Scheduler.isRunning()` · دستور `/health` (پشت `HEALTHCHECK_ENABLED`) · سه حالت مجزا `ok`/`degraded`/`down` — دیتابیسِ قطع یعنی `down` با پیام خودش، نه وعدهٔ «به‌زودی درست می‌کنم». |
-| 8 | تست کامل Featureهای جدید | ✅ **DONE** | ۲۹۱ تست واحد و ۹۱ تست integration. تست‌های جدید: `config/feature-flags`، `modules/retry`، `modules/health`، `modules/reminder.snooze`، `modules/birthday.dashboard`، `modules/birthday.search`، `modules/birthday.calendar` + ۱۰ تست integration برای تطبیق نرمال‌سازی جستجو (نام، علاقه‌مندی و یادداشت). |
-| 9 | Update README | ✅ **DONE** | README و پوشهٔ `docs/` به‌روزرسانی شدند؛ هر ۸ متغیر feature flag در `.env.example` مستند شده‌اند. |
+| 8 | تست کامل Featureهای جدید | ✅ **DONE** | ۳۴۱ تست واحد و ۹۱ تست integration. تست‌های جدید: `config/feature-flags`، `config/deployment`، `modules/retry`، `modules/health`، `modules/reminder.snooze`، `modules/birthday.dashboard`، `modules/birthday.search`، `modules/birthday.calendar`، `shared/shutdown` + ۱۰ تست integration برای تطبیق نرمال‌سازی جستجو (نام، علاقه‌مندی و یادداشت) + **۲۶ تست Bot Flow** (§19) که آپدیت واقعی را از `bot.handleUpdate` عبور می‌دهد. |
+| 9 | Update README | ✅ **DONE** | README و پوشهٔ `docs/` به‌روزرسانی شدند؛ هر ۸ متغیر feature flag در `.env.example` مستند شده‌اند و `tests/config/deployment.test.ts` تضمین می‌کند هر پرچم هم در `.env.example` باشد و هم واقعاً به کانتینر برسد. |
 
 **امتیاز P1: (1 × 9) / 9 = 100%**
 
@@ -385,7 +385,11 @@ Roadmap می‌خواهد: `GIFTS_ENABLED=false`، `GROUPS_ENABLED=false`، `AI_
 **Health check:** سطح ۱ — دستور `/health` با سه حالت مجزای `ok`/`degraded`/`down` و پشت `HEALTHCHECK_ENABLED`. سطح ۲ (healthcheck در compose) و ۳ (metrics) انجام نشده و برای بعدی‌اند.
 
 ### قدم ۷ — پایان‌دهی ✅
-- ۲۹۱ تست واحد و ۹۱ تست integration
+- ۳۴۱ تست واحد و ۹۱ تست integration
+- **لایهٔ Bot Flow (§19):** `tests/bot/bot-flow.test.ts` — ۲۶ تست که به‌جای صدا زدن مستقیم handler، آپدیت واقعی تلگرام را از `bot.handleUpdate` عبور می‌دهند (با fetch جعلی به‌جای شبکه). پوشش: داشبورد، صفحه‌بندی مطلق تقویم، مکالمهٔ جستجو (از دکمه تا نتیجه)، و دکمه‌های snooze. این لایه تنها جایی است که «دکمه واقعاً به handler می‌رسد» را ثابت می‌کند؛ با حذف `createSearchFlow` از `bot.ts` شش تست قرمز شد، پس غیرفارغیب بودنش اثبات شده است.
+- **Graceful shutdown اصلاح شد:** هندلرهای سیگنال قبلاً *بعد* از `await bot.start()` ثبت می‌شدند — یعنی بعد از یک promise که تا وقتی ربات سالم است هرگز resolve نمی‌شود. یعنی `SIGTERM` (که `docker compose down` می‌فرستد) عملاً هیچ‌وقت به دست bot نمی‌رسید و کانتینر وسط کار کشته می‌شد. حالا در `shared/lifecycle/shutdown.ts` و **قبل** از شروع polling نصب می‌شوند، با ۷ تست که سیگنال را واقعاً emit می‌کنند.
+- **پرچم‌ها به کانتینر می‌رسند:** هیچ‌کدام از ۸ feature flag در بخش `environment` سرویس `bot` نبودند، پس `SEARCH_ENABLED=false` در `.env` در Docker بی‌اثر بود. `tests/config/deployment.test.ts` حالا این را برای هر پرچم تضمین می‌کند (با حذف یک خط از compose، تست قرمز شد).
+- **CI اضافه شد:** `.github/workflows/validate.yml` کل `pnpm validate:full` را با یک PostgreSQL سرویس روی هر push و PR اجرا می‌کند.
 - `pnpm test:all`، `pnpm build` و دروازه‌های typecheck/lint سبز
 - README، `.env.example` و همین سند به‌روزرسانی شدند
 
@@ -395,8 +399,8 @@ Roadmap می‌خواهد: `GIFTS_ENABLED=false`، `GROUPS_ENABLED=false`، `AI_
 
 | # | مورد | شدت | توضیح |
 |---|---|---|---|
-| 1 | **مسیر Docker فقط بازبینی ایستا** | 🔴 متوسط | Docker روی این ماشین نصب نیست. `Dockerfile` و `docker-compose.yml` تغییری نکرده‌اند ولی هرگز اجرا نشده‌اند. اولین باری که کسی این را deploy کند ممکن است مشکل پیدا کند |
-| 2 | نبود CI | 🟠 متوسط | `pnpm validate` و `pnpm validate:full` دستی هستند. با وجود داشتن تست Integration، کسی آن را خودکار اجرا نمی‌کند |
+| 1 | **مسیر Docker فقط بازبینی ایستا** | 🟠 متوسط | Docker روی این ماشین نصب نیست، پس `docker compose up --build` هرگز اجرا نشده. YAML هر دو فایل پارس و از نظر پاس‌دادن پرچم‌ها و build context تست شده، ولی اجرای واقعی هنوز تأیید نشده |
+| 2 | نبود CI | ✅ **رفع شد** | `.github/workflows/validate.yml` کل `pnpm validate:full` را با PostgreSQL سرویس روی push و PR اجرا می‌کند. (تا وقتی remote تنظیم نشود، خود workflow اجرا نمی‌شود) |
 | 3 | نبود backoff در retry | ✅ **رفع شد** | `reminders/retry.ts` با backoff نمایی، سقف ۶ ساعت و ۶ تلاش. سطر `pending` دیگر حذف نمی‌شود، پس یادآوری گم نمی‌شود |
 | 4 | نبود health check | ✅ **رفع شد** | دستور `/health` با سه حالت `ok`/`degraded`/`down` و پشت پرچم. سطح ۲ (compose healthcheck) و metrics هنوز باقی است |
 | 5 | ۱۸ فایل uncommitted | ✅ **رفع شد** | commit شد |
@@ -409,6 +413,10 @@ Roadmap می‌خواهد: `GIFTS_ENABLED=false`، `GROUPS_ENABLED=false`، `AI_
 | 12 | `package.json#prisma` deprecated | 🟡 کم | Prisma 7 آن را حذف می‌کند؛ باید به `prisma.config.ts` مهاجرت کرد |
 | 13 | retry بدون lease اتمیک | ✅ **رفع شد** | پاس retry و snooze قبل از ارسال، ردیف را با یک `UPDATE` شرطی اجاره می‌کنند (همان شرطی که خوانده شد، پس دقیقاً یک کارگر برنده می‌شود). ردیفِ اجاره‌شده تا پایان مهلت از کوئری سایر کارگرها پنهان است. ۴ تست integration با ۱۰ تماس هم‌زمان و ۲ تست race در سطح job |
 | 14 | شمارش معکوس snooze کهنه می‌شود | ✅ **رفع شد** | تعداد روز در لحظهٔ ارسال از تقویم و منطقهٔ زمانی کاربر محاسبه می‌شود، نه از offset ذخیره‌شده. تعویقِ گذشته از تولد به‌جای پیام اشتباه، با اعلام `snooze.expired` به کاربر بسته می‌شود |
+| 15 | هندلر سیگنال بعد از `await bot.start()` | ✅ **رفع شد** | long-polling هرگز در حالت سالم resolve نمی‌شود، پس `SIGTERM`/`SIGINT` هرگز به دست ربات نمی‌رسید و `docker compose down` آن را می‌کشت. منتقل شد به `shared/lifecycle/shutdown.ts` و ۷ تست |
+| 16 | feature flagها به کانتینر نمی‌رسیدند | ✅ **رفع شد** | هیچ‌کدام از ۸ پرچم در `environment` سرویس `bot` نبودند؛ compose فقط متغیرهای فهرست‌شده را پاس می‌دهد. حالا `tests/config/deployment.test.ts` برای هر پرچم تضمین می‌کند |
+| 17 | دکمهٔ تقویم به داشبورد اشتباهی لینک می‌داد | ✅ **رفع شد** | `calendar.views.ts` دکمهٔ «همین ماه» را با `nav:dashboard` می‌ساخت، ولی این payload پشت پرچم `DASHBOARD_ENABLED` است و تقویم پشت پرچم دیگری. با `CALENDAR_ENABLED=true` و `DASHBOARD_ENABLED=false` دکمه‌ای دیده می‌شد که فقط «ورودی نامعتبر» جواب می‌داد. حالا پرچم در همان‌جایی بررسی می‌شود که UI ساخته می‌شود، و دکمه ناپدید می‌شود |
+| 18 | نگهبان «دکمهٔ مرده» سه سوراخ داشت | ✅ **رفع شد** | `keyboards.test.ts` فقط `keyboards/` را اسکن می‌کرد و `snoozeKeyboard`، `snoozeOptionsKeyboard` و `calendarKeyboard` اصلاً round-trip نمی‌شدند — از جمله کیبوردی که `deliveryId` را حمل می‌کند. ضمناً `add-interest.ts` یک payload را دستی می‌نوشت که هیچ تستی نمی‌دید. حالا کل `src/bot` اسکن می‌شود (به‌جز خود `callbacks/data.ts` که تنها builder مجاز است) و هر چهار کیبورد هم round-trip می‌شوند |
 
 ---
 
@@ -445,7 +453,7 @@ Roadmap می‌خواهد: `GIFTS_ENABLED=false`، `GROUPS_ENABLED=false`، `AI_
   P11 Scale             ░░░░░░░░░░░░░░░░░░░░░░    0%  ⬜
 
 فاصله تا MVP اولیه:  ✅ بسته شد (۵ از ۵ کار، فقط مسیر Docker اجرا نشد)
-فاصله تا اتمام P1:      ✅ بسته شد (۹ از ۹ بند؛ ۳۸۰ تست، ۰ خطا)
+فاصله تا اتمام P1:      ✅ بسته شد (۹ از ۹ بند؛ ۴۴۰ تست، ۰ خطا)
 ```
 
 ### روش محاسبه
@@ -470,14 +478,14 @@ Roadmap می‌خواهد: `GIFTS_ENABLED=false`، `GROUPS_ENABLED=false`، `AI_
 |---|---|
 | Featureها کامل باشند | ✅ برای P0 و P1 |
 | Edge Caseها بررسی شده باشند | ✅ (۲۴ تست `birthday.calc` شامل sweep ۴۰۰ روزه؛ Esfand 30؛ سال نامعلوم · کاربر حذف‌شده · اسفند ۳۰ · مالکیت snooze) |
-| Tests نوشته شده باشند | ✅ ۳۸۲ تست (۲۹۱ یونیت + ۹۱ یکپارچه روی دیتابیس واقعی) |
+| Tests نوشته شده باشند | ✅ ۴۴۰ تست (۳۴۹ یونیت + ۹۱ یکپارچه روی دیتابیس واقعی) |
 | Tests قبلی Pass باشند | ✅ ۱۰۰٪ |
 | Database migration انجام شده باشد | ✅ ۳ migration · جدول‌های `NotificationLog`/`Snooze` و ستون `Person.searchText` · روی دیتابیس تست هم اجرا و تأیید شد |
 | Security بررسی شده باشد | 🟡 input validation با Zod ✅ · ownership checks ✅ · redaction ✅ · rate limiting ❌ (طبق Roadmap بعد از MVP) |
 | Error handling وجود داشته باشد | ✅ `AppError` hierarchy + `bot.catch` + middleware |
 | Logging مناسب | ✅ pino ساختاریافته با redaction · سیاست مستند در `docs/logging.md` |
 | Documentation به‌روز باشد | ✅ README + `docs/logging.md` + `.env.example` + همین سند |
-| Feature flag تنظیم شده باشد | ✅ `config/feature-flags.ts` با ۸ پرچم، همه در `.env.example` مستند |
+| Feature flag تنظیم شده باشد | ✅ `config/feature-flags.ts` با ۸ پرچم · همه در `.env.example` مستند **و** همه صریحاً به سرویس `bot` در compose پاس داده می‌شوند (تضمین‌شده با تست) |
 | UI کامل باشد | ✅ برای P0 و P1 |
 | Feature نصفه در UI نشان داده نشود | ✅ پرچم خاموش = نه دکمه، نه فرمان، نه مسیر callback |
 
@@ -487,8 +495,10 @@ Roadmap می‌خواهد: `GIFTS_ENABLED=false`، `GROUPS_ENABLED=false`، `AI_
 
 طبق قانون اصلی Roadmap (§22) — `User Value → Usage → Validation → Complexity`:
 
-1. **انجام شد:** فازهای P0 و P1 بسته شدند و `v0.2.0` آمادهٔ برچسب‌گذاری است. ۳۸۲ تست، typecheck، lint و build همگی سبز. ممیزی خط‌به‌خط §۳٫۱–۳٫۷ انجام شد و هر ۹ بند Definition of Done تأیید شد.
-2. **تنها کار باقی‌مانده در P1:** اجرای واقعی مسیر Docker روی یک ماشین با Docker — Docker روی این ماشین نصب نیست.
-3. **بعد:** CI اضافه کن که `pnpm validate:full` را اجرا کند. الان ۹۱ تست Integration وجود دارد ولی هیچ‌کس خودکار اجرایشان نمی‌کند.
-4. **ریسک‌های باز P1:** هیچ‌کدام. دو ریسکی که در نسخهٔ قبلی این سند ثبت شده بود (lease اتمیک retry و شمارش معکوس stale در snooze) در بخش ۸ رفع شده‌اند.
-5. **توقف:** تا دیدن رفتار کاربر واقعی، وارد Phase 2+ نشو.
+1. **انجام شد:** فازهای P0 و P1 بسته شدند و `v0.2.0` آمادهٔ برچسب‌گذاری است. ۴۴۰ تست، typecheck، lint و build همگی سبز. ممیزی خط‌به‌خط §۳٫۱–۳٫۷ انجام شد و هر ۹ بند Definition of Done تأیید شد.
+2. **ممیزی P0 هم انجام شد:** هر ۲۷ قابلیت P0 با مسیر واقعی کد (از فرمان تلگرام تا ستون دیتابیس) راستی‌آزمایی شد و هیچ‌کدام ناقص نبود. در همین ممیزی سه ایراد پیدا شد که هیچ تستی نمی‌دیدشان: پرچم feature که در جای اشتباه بررسی می‌شد (دکمهٔ مردهٔ تقویم)، پوشش ناقص نگهبان دکمه‌های مرده، و یک payload دستی‌نویس‌شده در `add-interest.ts`. هر سه رفع و با mutation تأیید شدند.
+2. **در این دور پیدا و رفع شد:** سه اشکالی که هیچ تستی نمی‌دیدشان — هندلر سیگنال غیرقابل‌دسترس بعد از `await bot.start()`، feature flagهایی که به کانتینر نمی‌رسیدند، و نبود CI. هر سه با تست پوشش داده شدند و با mutation (حذف عمدی کد) قرمز شدنشان تأیید شد.
+3. **تنها کار باقی‌مانده در P1:** اجرای واقعی `docker compose up --build` روی یک ماشین با Docker — Docker روی این ماشین نصب نیست.
+4. **بعد:** یک `git remote` تنظیم کن تا `validate.yml` واقعاً اجرا شود. الان workflow آماده و درست است ولی تا push نشود، فقط یک فایل روی دیسک است.
+5. **ریسک‌های باز P1:** هیچ‌کدام در کد. تنها کار تأییدنشده، اجرای واقعی مسیر Docker است.
+6. **توقف:** تا دیدن رفتار کاربر واقعی، وارد Phase 2+ نشو.

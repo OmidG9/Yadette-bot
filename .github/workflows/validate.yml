@@ -1,0 +1,67 @@
+name: validate
+
+# The full gate from §21: typecheck, lint, every unit test, every integration
+# test against a real PostgreSQL, and a production build. Runs on push and on
+# every pull request so a broken migration or a red test is caught before review.
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+# A newer commit on the same ref makes this run pointless.
+concurrency:
+  group: validate-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_USER: yadette
+          POSTGRES_PASSWORD: yadette
+          POSTGRES_DB: yadette_test
+        ports:
+          - 5432:5432
+        # `pnpm validate:full` starts the moment the service reports healthy, so
+        # without this the first migration races the database's own startup.
+        options: >-
+          --health-cmd "pg_isready -U yadette -d yadette_test"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+
+    env:
+      CI: 'true'
+      # `validate`/`build` load config/env.ts, which refuses to start without a
+      # syntactically valid token. No request is ever made with it.
+      BOT_TOKEN: '0000000000000000000000000000000000000000:ci-placeholder-token'
+      # Distinct from TEST_DATABASE_URL on purpose: the integration suite aborts
+      # if the two name the same database, because it truncates every table.
+      DATABASE_URL: postgresql://yadette:yadette@localhost:5432/yadette?schema=public
+      TEST_DATABASE_URL: postgresql://yadette:yadette@localhost:5432/yadette_test?schema=public
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: pnpm/action-setup@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Typecheck, lint, unit + integration tests, build
+        run: pnpm validate:full

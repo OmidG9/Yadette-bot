@@ -9,6 +9,8 @@ import {
   interestsKeyboard,
   pendingReminderKeyboard,
   reminderKeyboard,
+  snoozeKeyboard,
+  snoozeOptionsKeyboard,
 } from '../../src/bot/keyboards/reminder.js';
 import {
   listKeyboard,
@@ -21,11 +23,13 @@ import {
   timezoneKeyboard,
 } from '../../src/bot/keyboards/settings.js';
 import { welcomeKeyboard } from '../../src/bot/keyboards/start.js';
-import { allFlagsOn } from '../helpers/feature-flags.js';
+import { calendarKeyboard } from '../../src/bot/views/calendar.views.js';
+import { allFlagsOn, flagsExcept } from '../helpers/feature-flags.js';
 import type { UserSettings } from '../../src/modules/settings/settings.repository.js';
 import type { ReminderRecord } from '../../src/modules/reminders/reminder.types.js';
 import type { InterestRecord, PersonWithReminders } from '../../src/modules/people/person.types.js';
 import type { UpcomingBirthday } from '../../src/modules/birthdays/birthday.types.js';
+import type { BirthdayMonth } from '../../src/modules/birthdays/calendar.js';
 
 const personId = 'clx1234567890abcdefghijklm';
 
@@ -36,6 +40,12 @@ const settings: UserSettings = {
 };
 
 const stamp = { createdAt: new Date(0), updatedAt: new Date(0) };
+
+const today = { jy: 1404, jm: 1, jd: 5 };
+
+const januaryMonth: BirthdayMonth = { jalaliYear: 1404, jalaliMonth: 1, days: [], total: 0 };
+const decemberMonth: BirthdayMonth = { ...januaryMonth, jalaliMonth: 12 };
+const februaryMonth: BirthdayMonth = { ...januaryMonth, jalaliMonth: 2 };
 
 const reminder = (daysBefore: number, enabled: boolean): ReminderRecord => ({
   id: `rem${daysBefore}`,
@@ -82,8 +92,7 @@ const upcoming = (id: string, name: string): UpcomingBirthday => {
 };
 
 /** URL buttons carry no `callback_data` and never reach the parser. */
-function payloads(keyboard: unknown): string[] {
-  return (keyboard as { inline_keyboard: { callback_data?: string }[][] }).inline_keyboard
+function payloads(keyboard: unknown): string[] {  return (keyboard as { inline_keyboard: { callback_data?: string }[][] }).inline_keyboard
     .flat()
     .map((button) => button.callback_data)
     .filter((data): data is string => typeof data === 'string');
@@ -93,6 +102,15 @@ function labels(keyboard: unknown): string[] {
   return (keyboard as { inline_keyboard: { text: string }[][] }).inline_keyboard.flat().map(
     (button) => button.text,
   );
+}
+
+/** Every `.ts` file under a directory, recursively. */
+function walk(dir: string): string[] {
+  return readdirSync(dir, { withFileTypes: true }).flatMap((entry) => {
+    const full = join(dir, entry.name);
+    if (entry.isDirectory()) return walk(full);
+    return entry.name.endsWith('.ts') ? [full] : [];
+  });
 }
 
 const KEYBOARDS: [string, unknown][] = [
@@ -115,6 +133,12 @@ const KEYBOARDS: [string, unknown][] = [
   ['flowNavKeyboard (next + back)', flowNavKeyboard({ canSkip: true, canGoBack: true })],
   ['flowNavKeyboard (back only)', flowNavKeyboard({ canSkip: false, canGoBack: true })],
   ['flowNavKeyboard (next only)', flowNavKeyboard({ canSkip: true, canGoBack: false })],
+  ['snoozeKeyboard', snoozeKeyboard('log123')],
+  ['snoozeOptionsKeyboard', snoozeOptionsKeyboard('log123')],
+  ['calendarKeyboard (current month)', calendarKeyboard(januaryMonth, today, 'fa', allFlagsOn())],
+  ['calendarKeyboard (paged back)', calendarKeyboard(decemberMonth, today, 'fa', allFlagsOn())],
+  ['calendarKeyboard (paged forward)', calendarKeyboard(februaryMonth, today, 'fa', allFlagsOn())],
+  ['calendarKeyboard (dashboard flag off)', calendarKeyboard(januaryMonth, today, 'fa', flagsExcept('dashboard'))],
 ];
 
 /**
@@ -140,26 +164,66 @@ describe('button labels', () => {
 });
 
 /**
+ * A button that points at a feature turned off is a button that answers
+ * "invalid input" when tapped. `calendarKeyboard` rendered a `nav:dashboard`
+ * shortcut that `nav:calendar` never gated, so it was reachable only by luck of
+ * the default flags. A flag is checked where the UI is built.
+ */
+describe('no keyboard renders a button for a disabled feature', () => {
+  it('drops the calendar dashboard shortcut when the dashboard flag is off', () => {
+    const withDashboard = payloads(calendarKeyboard(januaryMonth, today, 'fa', allFlagsOn()));
+    expect(withDashboard).toContain('nav:dashboard');
+
+    const withoutDashboard = payloads(
+      calendarKeyboard(januaryMonth, today, 'fa', flagsExcept('dashboard')),
+    );
+    expect(withoutDashboard).not.toContain('nav:dashboard');
+    // The calendar's own controls survive; only the foreign button is gone.
+    expect(withoutDashboard).toContain('cal:1404:02');
+    expect(withoutDashboard).toContain('nav:menu');
+  });
+
+  it('still offers paging backwards on a paged month, dashboard flag or not', () => {
+    for (const flags of [allFlagsOn(), flagsExcept('dashboard')]) {
+      const data = payloads(calendarKeyboard(decemberMonth, today, 'fa', flags));
+      expect(data).toContain('cal:1404:11');
+      expect(data).toContain('cal:1405:01');
+    }
+  });
+});
+
+/**
  * Callback strings are a wire format with three coupled sides: the builder that
  * writes it, the parser that reads it, and the dispatcher that acts on it. A
  * hand-typed payload can only break the first two — it parses fine and then does
  * nothing — so nothing short of banning the literal can catch it.
  */
-describe('keyboards never hand-type a callback payload', () => {
-  const RAW = /['`](nav:[a-z]+|person:[a-z:]+|flow:[a-z:]+|reminder:[a-z:]+|interest:[a-z:]+|settings:[a-z:]+)['`]/;
+describe('no file builds a callback payload by hand', () => {
+  // Only `callbacks/data.ts` may name a payload: it is the single builder. A
+  // comparison against `data.kind` elsewhere is the parser's own vocabulary and
+  // is excluded, or this test would flag every dispatcher.
+  const BUILDER_DIR = join('callbacks', 'data.ts');
+  const RAW = /['`](nav:[a-z]+|person:[a-z:]+|flow:[a-z:]+|reminder:[a-z:]+|interest:[a-z:]+|settings:[a-z:]+|snz:[a-z:]+|cal:[a-z:]+)['`]/;
 
-  it('finds no raw payload literals in src/bot/keyboards', () => {
-    const dir = join(process.cwd(), 'src', 'bot', 'keyboards');
+  it('finds no raw payload literals outside callbacks/data.ts', () => {
+    const root = join(process.cwd(), 'src', 'bot');
     const offenders: string[] = [];
 
-    for (const file of readdirSync(dir).filter((name) => name.endsWith('.ts'))) {
-      const full = join(dir, file);
-      readFileSync(full, 'utf8')
+    for (const file of walk(root)) {
+      const relative = file.slice(root.length + 1);
+      if (relative === BUILDER_DIR) continue;
+
+      readFileSync(file, 'utf8')
         .split('\n')
         .forEach((line, i) => {
-          // Ignore comment lines: documenting a payload is fine.
-          if (/^\s*(\*|\/\/)/.test(line)) return;
-          if (RAW.test(line)) offenders.push(`${file}:${i + 1}  ${line.trim()}`);
+          // Ignore comment lines: documenting a payload is fine, and several
+          // doc comments name one on the same line as the `/**`.
+          if (/^\s*(\*|\/\/|\/\*)/.test(line)) return;
+          // `data.kind === 'person:edit'` and `case 'person:del:ask':` compare
+          // against a parsed kind; that is reading the wire format, not writing
+          // it. Only a literal in value position can become a button payload.
+          if (/\bkind\b|\bcase\b/.test(line)) return;
+          if (RAW.test(line)) offenders.push(`${relative}:${i + 1}  ${line.trim()}`);
         });
     }
 

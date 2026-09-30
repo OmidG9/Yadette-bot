@@ -5,6 +5,7 @@ import { ValidationError } from '../../shared/errors/index.js';
 import type { AppContext } from '../context.js';
 import { editOrSend } from '../helpers.js';
 import { cancelKeyboard, interestsKeyboard } from '../keyboards/reminder.js';
+import { personCallback } from '../callbacks/data.js';
 import { interestsText } from '../views/person.views.js';
 import type { Services } from '../../container.js';
 import type { FlowDefinition, FlowState } from './flow.js';
@@ -43,7 +44,11 @@ export function createAddInterestFlow(services: Services, store: FlowStore): Flo
         );
 
         if (added.length === 0) {
-          await editOrSend(ctx, t('errors.invalidInput', lang), cancelKeyboard(`person:interests:${personId}`, lang));
+          await editOrSend(
+            ctx,
+            t('errors.invalidInput', lang),
+            cancelKeyboard(personCallback('interests', personId), lang),
+          );
           return {};
         }
 
@@ -79,5 +84,9 @@ export async function startAddInterest(
     data: { personId },
     messageId: null,
   });
-  await editOrSend(ctx, t('interests.askAdd', lang), cancelKeyboard(`person:interests:${personId}`, lang));
+  await editOrSend(
+    ctx,
+    t('interests.askAdd', lang),
+    cancelKeyboard(personCallback('interests', personId), lang),
+  );
 }

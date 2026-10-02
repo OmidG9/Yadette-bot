@@ -1,4 +1,4 @@
-/**
+﻿/**
  * Persian strings (the only locale in the MVP).
  *
  * This is the single place for user-facing copy; business logic contains no
@@ -253,7 +253,8 @@ export const fa = {
     interests: '❤️ علایقش:\n{{list}}',
     footer: 'یه چیزی براش توی ذهنت جوشیدن؟ 😉',
     today: '🎉 امروز تولد <b>{{name}}</b> هست!',
-    todayBody: 'اگه هنوز براش کاری نکردی، امروز بهترین فرصته. ❤️\n\n<i>هر سال یه سال دیگه باهاش!</i>',
+    todayBody:
+      'اگه هنوز براش کاری نکردی، امروز بهترین فرصته. ❤️\n\n<i>هر سال یه سال دیگه باهاش!</i>',
   },
   countdown: {
     today: 'امروز',
@@ -282,11 +283,13 @@ export const fa = {
   },
   search: {
     title: '🔎 <b>جستجوی افراد</b>',
-    prompt: 'اسم، علاقه‌مندی یا کلمه‌ای از یادداشت رو بنویس.\n\n💡 مثلاً: <b>فوتبال</b>، <b>مادر</b>، <b>قهوه</b>',
+    prompt:
+      'اسم، علاقه‌مندی یا کلمه‌ای از یادداشت رو بنویس.\n\n💡 مثلاً: <b>فوتبال</b>، <b>مادر</b>، <b>قهوه</b>',
     resultsTitle: '🔎 نتیجه برای «<b>{{query}}</b>»',
     resultsCount: '{{count}} نفر پیدا شد.',
     item: '• <b>{{name}}</b> · 🎂 {{date}} · ⏳ {{countdown}}',
-    empty: 'کسی با «{{query}}» پیدا نشد.\n\n💡 یه چیز دیگه امتحان کن، یا اگه مطمئنی این شخص رو ثبت نکردی، همین‌جا اضافه‌اش کن.',
+    empty:
+      'کسی با «{{query}}» پیدا نشد.\n\n💡 یه چیز دیگه امتحان کن، یا اگه مطمئنی این شخص رو ثبت نکردی، همین‌جا اضافه‌اش کن.',
     tooShort: '🔍 یه کم بیشتر بنویس — حداقل {{min}} حرف.',
     hint: '💡 جستجو توی اسم، علاقه‌مندی‌ها و یادداشت‌ها انجام می‌شه.',
   },
@@ -311,23 +314,64 @@ export const fa = {
     expired: 'این یادآوری دیگه اعتبار نداره. تولد بعدی رو از «🎂 تولدها» ببین 🙂',
     alreadySnoozed: 'این یادآوری قبلاً تنظیم شده.',
   },
-  health: {
+  chat: {
+    thinking: '<b>������ �.�O�?O���^��...</b>',
+    typing: '<b>������ �.�O�?O���^��...</b>',
+    generating: '<b>������ ���^�O ���^�"��...</b>',
+    streaming: '<b>���.�� ���^�O ���^�"��...</b>',
+    sending: '������ ��������O��...',
+    sent: '�����O���� ���.',
+    failed: '�?O ��������O�� �.����"�O ���O�� ���^�.��.',
+    retry: '�o-���� ��������O��',
+    retrying: '������ �����������...',
+    autoScroll: '���.�����O�� ���������O',
+    copy: '�����O�O��',
+    copied: '�����O���� ���.',
+  },  feedback: {
+    saved: '<b>ذخیره شد.</b>',
+    updated: '<b>به‌روزرسانی شد.</b>',
+    deleted: '<b>حذف شد.</b>',
+    copied: '<b>کپی شد.</b>',
+    done: '<b>انجام شد.</b>',
+    success: '<b>موفقیت‌آمیز بود.</b>',
+    failed: 'خطایی رخ داد.',
+    pleaseWait: 'لطفاً صبر کنید...',
+    working: 'در حال انجام کار...',
+    retry: 'تلاش مجدد',
+    tryAgain: 'دوباره تلاش کنید',
+  },  health: {
     title: '🩺 <b>وضعیت بات</b>',
-    ok: '✅ همه‌چیز سالمه.',
-    database: '🗄 دیتابیس: {{value}}',
-    reachable: 'متصل',
-    unreachable: 'قطع — {{value}}',
-    reminders: '⏰ یادآوری‌ها: {{value}}',
-    schedulerUp: 'در حال اجرا',
-    schedulerDown: 'متوقف',
+    ok: '✅ همه‌چیز درست کار می‌کنه.',
+    database: '🗄 پایگاه داده: {{value}}',
+    reachable: '✅ در دسترس',
+    unreachable: '❌ در دسترس نیست: {{value}}',
+    reminders: '⏰ یادآورها: {{value}}',
+    schedulerUp: '✅ زمان‌بندی فعاله',
+    schedulerDown: '❌ زمان‌بندی فعال نیست',
     /** Shown when a probe fails; keeps the user out of the technical detail. */
-    degraded: '⚠️ یه مشکلی هست. به‌زودی درستش می‌کنم.',
+    degraded: '⚠️ بخشی از بات موقتاً درست کار نمی‌کنه. لطفاً کمی بعد دوباره امتحان کن.',
     /**
      * The database is unreachable, so no birthday can be stored or read. This is
      * deliberately distinct from `degraded`: promising a quick fix here would be
      * a lie, and the user may be about to miss a birthday.
      */
-    down: '❌ بات الان نمی‌تونه کار کنه. لطفاً کمی بعد دوباره سر بزن.',
+    down: '❌ پایگاه داده در دسترس نیست؛ فعلاً نمی‌تونم تولدها رو ذخیره یا نمایش بدم. کمی بعد دوباره امتحان کن.',
+  },
+  states: {
+    loading: {
+      title: '⏳ <b>در حال بارگذاری...</b>',
+      subtitle: 'لطفاً چند لحظه صبر کن.',
+    },
+    empty: {
+      title: '📭 <b>موردی پیدا نشد.</b>',
+      subtitle: 'با گزینه‌های دیگه دوباره امتحان کن.',
+      cta: '➕ افزودن شخص',
+    },
+    error: {
+      title: '⚠️ <b>بارگذاری انجام نشد.</b>',
+      subtitle: 'یه مشکلی پیش اومد. دوباره تلاش کن.',
+      retry: '🔄 تلاش دوباره',
+    },
   },
 } as const;
 

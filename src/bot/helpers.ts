@@ -1,4 +1,4 @@
-import type { InlineKeyboard, Keyboard } from 'grammy';
+﻿import type { InlineKeyboard, Keyboard } from 'grammy';
 import { mainMenuKeyboard } from './keyboards/main.js';
 import type { AppContext } from './context.js';
 import { t } from '../shared/i18n/index.js';
@@ -151,4 +151,31 @@ export async function showMainMenu(ctx: AppContext, text?: string): Promise<void
 export async function ackCallback(ctx: AppContext): Promise<void> {
   if (!ctx.callbackQuery) return;
   await ctx.answerCallbackQuery().catch(() => undefined);
+}
+
+export async function answerCallbackQueryWithToast(
+  ctx: AppContext,
+  text?: string,
+  showAlert = false,
+): Promise<void> {
+  try {
+    await ctx.answerCallbackQuery({
+      text: text ?? undefined,
+      show_alert: showAlert,
+    });
+  } catch {
+    // ignore
+  }
+}
+export async function withChatAction(
+  ctx: AppContext,
+  action: 'typing' | 'upload_photo' | 'record_video' | 'upload_video' | 'record_voice' | 'upload_voice' | 'upload_document' | 'choose_sticker' | 'find_location' | 'record_video_note' | 'upload_video_note',
+  fn: () => Promise<void>,
+): Promise<void> {
+  try {
+    await ctx.api.sendChatAction(ctx.chat?.id ?? 0, action);
+  } catch {
+    // ignore chat action errors
+  }
+  await fn();
 }

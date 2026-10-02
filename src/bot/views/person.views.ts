@@ -32,7 +32,11 @@ export function countdownLine(item: UpcomingBirthday, lang: Language): string {
 
 /** §15 — upcoming birthdays, sorted by the next occurrence. */
 export function upcomingListText(items: UpcomingBirthday[], lang: Language): string {
-  if (items.length === 0) return t('upcoming.empty', lang);
+  if (items.length === 0) {
+    const empty = t('upcoming.empty', lang);
+    const cta = t('states.empty.cta', lang);
+    return [empty, '', '<b>' + safe(cta) + '</b>'].join('\n');
+  }
 
   const lines = items.map((item, index) =>
     t('upcoming.item', lang, {

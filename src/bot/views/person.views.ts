@@ -88,7 +88,14 @@ export function personDeletedText(name: string, lang: Language): string {
 
 /** §11 — final step of the add-person flow. */
 export function addPersonConfirmationText(
-  data: { name: string; month: number; day: number; year: number | null; notes: string | null },
+  data: {
+    name: string;
+    month: number;
+    day: number;
+    year: number | null;
+    notes: string | null;
+    reminderDays: number[];
+  },
   interests: string[],
   lang: Language,
 ): string {
@@ -100,14 +107,27 @@ export function addPersonConfirmationText(
 
   if (interests.length > 0) {
     parts.push('', t('person.interests', lang));
-    parts.push(interests.map((title) => t('interests.item', lang, { title: safe(title) })).join('\n'));
+    parts.push(
+      interests.map((title) => t('interests.item', lang, { title: safe(title) })).join('\n'),
+    );
   }
 
   if (data.notes) {
     parts.push('', `${t('person.notes', lang)}`, safe(truncate(data.notes, 300)));
   }
 
-  parts.push('', t('hint.keyboard', lang));
+  // The reminder toggles are the only control on this screen, so the message
+  // states what they currently hold. Without a count next to them the grid reads
+  // as decoration and the user cannot tell whether anything is actually on.
+  parts.push(
+    '',
+    `<b>${t('reminders.askWhen', lang)}</b>`,
+    t('reminders.selectionCount', lang, {
+      count: toPersianDigits(data.reminderDays.length),
+    }),
+    t('reminders.legend', lang),
+  );
+
   return parts.join('\n');
 }
 

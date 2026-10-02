@@ -157,28 +157,95 @@ export const fa = {
     notes: '📝 یادداشت',
     reminders: '⏰ یادآوری‌ها: {{value}}',
   },
+  /**
+   * Quick picks: one tap instead of typing. Offered as inline buttons, so a
+   * step that has a common answer can be finished without the keyboard at all.
+   * Index-addressed, never sent through a callback payload.
+   */
+  presets: {
+    name: [
+      'مادر',
+      'پدر',
+      'همسر',
+      'خواهر',
+      'برادر',
+      'دوست',
+      'همکار',
+      'رفیق',
+      'معلم',
+      'همسایه',
+      'عمه',
+      'خاله',
+    ],
+    interest: [
+      'فوتبال',
+      'گیم',
+      'موسیقی',
+      'فیلم',
+      'کتاب',
+      'قهوه',
+      'شیرینی',
+      'سفر',
+      'ورزش',
+      'تکنولوژی',
+      'نقاشی',
+      'طبیعت',
+    ],
+  },
   addPerson: {
     /** Shows how far along the user is, so the flow never feels endless. */
-    progress: '📋 مرحله {{current}} از {{total}}',
+    progress: '📋 مرحله {{current}} از {{total}} · {{bar}}',
     askName:
-      '👤 <b>اسمش چیه؟</b>\n\n💡 همون اسمی رو بنویس که خودت صداش می‌زنی.\n\n<i>مثلاً: مادر، رضا، دوست قدیمی پارسا</i>',
-    askBirthday:
-      '🎂 تولد <b>{{name}}</b> کیه؟\n\n📅 هرجوری راحتی بنویس، من می‌فهمم:\n\n<b>۱۸ مهر ۱۳۸۰</b>\n<b>۲ آبان</b>\n<b>2001-10-10</b>\n\n💡 اگه سالش رو نداری هم اشکالی نداره؛ سنش رو خودم حساب می‌کنم.',
+      '👤 <b>اسمش چیه؟</b>\n\n💡 یکی از دکمه‌های پایین رو بزن، یا خودت بنویس.\n\n<i>مثلاً: مادر، رضا، دوست قدیمی پارسا</i>',
     askInterests:
-      '❤️ <b>{{name}}</b> چی دوست داره؟\n\n🎯 چند مورد رو با کاما جدا کن تا موقع تولد یادم بمونه:\n\n<i>مثلاً: گیم، فوتبال، قهوه</i>{{current}}',
+      '❤️ <b>{{name}}</b> چی دوست داره؟\n\n💡 دکمه‌های پایین رو بزن تا انتخاب شه، یا خودت بنویس:\n\n<i>مثلاً: گیم، فوتبال، قهوه</i>{{current}}',
     askNotes:
       '📝 یه نکته که دوست داشته باشی یادت بمونه؟\n\n💡 مثلاً: شیرینی دوست داره، اهل سفره{{current}}',
     /** Appended when «⏮ قبلی» re-opens a step that already has an answer. */
     currentAnswer: '\n\nالان: <b>{{value}}</b>',
+    /** Shown above the chip row of the name step. */
+    chipsTitle: '👇 یکی رو بزن یا خودت بنویس:',
+    /** Shown above the chip row of the interests step. */
+    interestsChipsTitle: '👇 هرچی دوست داره انتخاب کن (می‌تونی چندتا بزنی):',
+    /** Footer of the interests step once at least one chip is on. */
+    interestsDone: '✅ همین‌ها کافیه',
     confirmation: '✅ <b>{{name}}</b> آماده‌ست. مطمئنی ذخیره بشه؟',
-    invalidDate:
-      '❌ این تاریخ رو نشناختم.\n\n📅 یه بار دیگه امتحان کن، مثلاً:\n\n<b>۱۸ مهر ۱۳۸۰</b> یا <b>۲ آبان</b>',
-    invalidName:
-      '❌ یه اسم معتبر بنویس 🙂\n\n💡 مثلاً: <b>مادر</b>، <b>رضا</b>، <b>دوست قدیمی پارسا</b>',
+    invalidDate: '❌ این تاریخ رو نشناختم. یا از دکمه‌ها انتخاب کن، یا دوباره بنویس.',
+    invalidName: '❌ یه اسم معتبر بنویس 🙂 یا یکی از دکمه‌های پایین رو بزن.',
     saved: '🎉 <b>{{name}}</b> اضافه شد. از یادش نمی‌رم 🎂',
     /** Shown right after saving: what happens next. */
     savedFooter:
       '⏰ قبل از تولدش {{count}} بار یادت میارم. از زیر هم می‌تونی علایق، یادداشت و یادآوری‌هاش رو ببینی.',
+  },
+  /**
+   * §35 — the Jalali date picker of the add-person flow.
+   *
+   * Three screens (month → day → year) instead of one free-text answer. Typing
+   * a date still works on every screen: the step handler is unchanged.
+   */
+  picker: {
+    title: '🎂 تولد <b>{{name}}</b> کیه؟',
+    askMonth: '۱️⃣ ماه تولدش رو انتخاب کن:',
+    askDay: '۲️⃣ چندمه؟ · ماه <b>{{month}}</b>',
+    askYear: '۳️⃣ سالش رو انتخاب کن (اختیاری)',
+    /** Progress of the picker itself, under the title. */
+    subtitle: '{{done}} از ۳ مرحله انتخاب شد',
+    /** "month and day picked, now the year" — shown above the year grid. */
+    chosenSoFar: '✅ <b>{{date}}</b> انتخاب شد.',
+    noYear: '🤷 سال رو نمی‌دونم',
+    backScreen: '↩️ یه قدم عقب',
+    editName: '✏️ اسم رو عوض کن',
+    prevPage: '◀️ قبلی',
+    nextPage: 'بعدی ▶️',
+    /** After the year on each button of the year grid: «۲۵ سال». */
+    ageUnit: 'سال',
+    /** The day does not exist in the month chosen a screen earlier. */
+    invalidDay: '⚠️ این ماه این تعداد روز نداره؛ یه روز دیگه بزن.',
+    /** Always the last line: the escape hatch that needs no buttons. */
+    typeHint: '✍️ یا خودت بنویس: <b>۱۸ مهر ۱۳۸۰</b> · <b>۲ آبان</b>',
+    /** The year on screen does not exist for the chosen Esfand 30. */
+    yearMismatch: '⚠️ اسفند ۳۰ فقط توی سال‌های کبیسه وجود داره؛ یه سال دیگه بزن.',
+    footerCancel: '❌ لغو',
   },
   edit: {
     choose: '✏️ کدوم رو می‌خوای عوض کنی؟',
@@ -199,11 +266,24 @@ export const fa = {
   },
   reminders: {
     title: '⏰ یادآوری تولد <b>{{name}}</b>',
-    on: '☑️',
+    /**
+     * Toggle marks. A green check reads as "on" at a glance on every client,
+     * which the old ☑️/⬜️ pair did not.
+     */
+    on: '✅',
     off: '⬜️',
     item: '{{mark}} {{label}}',
     day0: 'روز تولد',
     daysBefore: '{{count}} روز قبل',
+    /** Button-sized variant: the question above it already says "how many days". */
+    daysShort: '{{count}} روز',
+    /** Header of the reminder grid on the confirmation screen. */
+    askWhen: '⏰ کِی یادت بیارم؟',
+    /** How many offsets are currently on. */
+    selectionCount: '{{count}} یادآوری روشنه',
+    resetDefaults: '🔄 پیش‌فرض',
+    save: '✅ ذخیره و ثبت',
+    legend: '<i>✅ یعنی یادت میارم · ⬜️ یعنی نه</i>',
   },
   delete: {
     confirm: '🗑 <b>{{name}}</b> رو حذف کنم؟\n\nدیگه برنمی‌گردتش.',
@@ -375,12 +455,40 @@ export const fa = {
   },
 } as const;
 
+/**
+ * Leaf strings of the dictionary, addressed by dot-path (`menu.upcoming`).
+ *
+ * String lists are excluded on purpose: they carry no placeholders and are read
+ * with `tl`, so letting `t` reach them would only produce the key itself.
+ */
 type NestedPaths<T> = {
-  [K in keyof T & string]: T[K] extends string ? `${K}` : `${K}.${NestedPaths<T[K]>}`;
+  [K in keyof T & string]: T[K] extends readonly string[]
+    ? never
+    : T[K] extends string
+      ? K
+      : `${K}.${NestedPaths<T[K]>}`;
+}[keyof T & string];
+
+/**
+ * Dot-path of every string list in the dictionary, e.g. `presets.name`.
+ *
+ * Recursive because the lists are not at the root: `presets.name` is a list one
+ * level down, and a one-level version of this would type it as `never` and reject
+ * every `tl()` call.
+ */
+type ListPaths<T> = {
+  [K in keyof T & string]: T[K] extends readonly string[]
+    ? K
+    : T[K] extends object
+      ? `${K}.${ListPaths<T[K]>}`
+      : never;
 }[keyof T & string];
 
 /** Dot-path of every leaf string in the dictionary, e.g. `menu.upcoming`. */
 export type TranslationKey = NestedPaths<typeof fa>;
+
+/** Dot-path of every list in the dictionary, e.g. `presets.name`. */
+export type ListKey = ListPaths<typeof fa>;
 
 export type Dictionary = typeof fa;
 export type TranslationParams = Record<string, string | number>;

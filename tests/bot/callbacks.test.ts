@@ -48,11 +48,13 @@ describe('callback data round-trip', () => {
   });
 
   it('parses reminder toggles and pending days', () => {
-    expect(parseCallbackData(reminderToggleCallback(personId, 7))).toEqual({
+    expect(parseCallbackData('reminder:toggle:person1:7')).toEqual({
       kind: 'reminder:toggle',
-      personId,
+      personId: 'person1',
       days: 7,
     });
+    expect(parseCallbackData('reminder:pending:14')).toEqual({ kind: 'reminder:pending', days: 14 });
+    expect(parseCallbackData('reminder:def')).toEqual({ kind: 'reminder:defaults' });
     expect(parseCallbackData(reminderPendingCallback(0))).toEqual({
       kind: 'reminder:pending',
       days: 0,
@@ -70,6 +72,9 @@ describe('callback data round-trip', () => {
       personId,
     });
     expect(parseCallbackData('flow:person:save')).toEqual({ kind: 'flow:person:save' });
+    expect(parseCallbackData('flow:person:back')).toEqual({ kind: 'flow:person:back' });
+    expect(parseCallbackData('flow:person:next')).toEqual({ kind: 'flow:person:next' });
+    expect(parseCallbackData('flow:person:keep')).toEqual({ kind: 'flow:person:keep' });
   });
 
   it('parses navigation', () => {

@@ -1,6 +1,6 @@
-import { fa, type Dictionary, type TranslationKey, type TranslationParams } from './fa.js';
+import { fa, type Dictionary, type ListKey, type TranslationKey, type TranslationParams } from './fa.js';
 
-export type { TranslationKey, TranslationParams };
+export type { TranslationKey, TranslationParams, ListKey };
 
 /** Supported languages. Persian only in the MVP — the plumbing is already here. */
 export const SUPPORTED_LANGUAGES = ['fa'] as const;
@@ -12,7 +12,7 @@ export const DEFAULT_LANGUAGE: Language = 'fa';
 
 const PLACEHOLDER = /\{\{(\w+)\}\}/g;
 
-function resolve(dictionary: Dictionary, key: string): string | undefined {
+function node(dictionary: Dictionary, key: string): unknown {
   let current: unknown = dictionary;
 
   for (const part of key.split('.')) {
@@ -20,7 +20,12 @@ function resolve(dictionary: Dictionary, key: string): string | undefined {
     current = (current as Record<string, unknown>)[part];
   }
 
-  return typeof current === 'string' ? current : undefined;
+  return current;
+}
+
+function resolve(dictionary: Dictionary, key: string): string | undefined {
+  const value = node(dictionary, key);
+  return typeof value === 'string' ? value : undefined;
 }
 
 function interpolate(template: string, params?: TranslationParams): string {
@@ -57,4 +62,21 @@ export function languageDisplayName(lang: Language): string {
  */
 export function plainText(key: TranslationKey, lang?: Language, params?: TranslationParams): string {
   return t(key, lang, params).replace(/<\/?[a-z][^>]*>/gi, '');
+}
+
+/**
+ * A whole list of strings, for the copy that has to be rendered as buttons
+ * rather than as a sentence (quick picks, suggestions).
+ *
+ * Falls back to the default locale like `t`, and returns an empty list for a key
+ * that holds no list — a caller iterating it then simply renders no buttons,
+ * which is the correct behaviour for "no presets configured" and never crashes.
+ */
+export function tl(key: ListKey, lang: Language = DEFAULT_LANGUAGE): readonly string[] {
+  const dictionary = dictionaries[lang] ?? dictionaries[DEFAULT_LANGUAGE];
+  const value: unknown = node(dictionary, key);
+  // Widened to `unknown[]` before the guard so the return type can be stated
+  // instead of leaking the `any[]` that `Array.isArray` narrows to.
+  const entries: unknown[] = Array.isArray(value) ? value : [];
+  return entries.filter((entry): entry is string => typeof entry === 'string');
 }

@@ -6,6 +6,10 @@ const timezoneSchema = z.string().min(1).max(64).regex(/^[A-Za-z_+\-/0-9]+$/);
 /** Jalali year, bounded to a range no human will leave. */
 const jalaliYearSchema = z.coerce.number().int().min(1300).max(1500);
 const jalaliMonthSchema = z.coerce.number().int().min(1).max(12);
+/** Jalali day of the picker grid. */
+const jalaliDaySchema = z.coerce.number().int().min(1).max(31);
+/** Position of a quick pick inside its dictionary list. */
+const presetIndexSchema = z.coerce.number().int().min(0).max(19);
 
 /**
  * Validated shape of any callback payload.
@@ -20,6 +24,8 @@ const RawCallbackSchema = z
     days: daysSchema.optional(),
     year: jalaliYearSchema.optional(),
     month: jalaliMonthSchema.optional(),
+    day: jalaliDaySchema.optional(),
+    index: presetIndexSchema.optional(),
     timezone: timezoneSchema.optional(),
   })
   .strict();
@@ -76,6 +82,17 @@ const SETTINGS_ACTIONS = [
   'data:no',
 ] as const;
 
+/**
+ * Which list of the dictionary a `qp:*` payload addresses.
+ *
+ * Only an index travels over the wire: the word itself is a Persian (or later
+ * English) string, so putting it in a 64-byte payload would both risk the limit
+ * and freeze the vocabulary in the wire format.
+ */
+const QUICK_PICK_FIELDS = ['name', 'interest'] as const;
+
+export type QuickPickField = (typeof QUICK_PICK_FIELDS)[number];
+
 function isOneOf<T extends readonly string[]>(value: string, options: T): boolean {
   return (options as readonly string[]).includes(value);
 }
@@ -112,10 +129,25 @@ function toCandidate(raw: string): Record<string, unknown> {
       return { kind, personId: c };
     }
     case 'reminder':
-      // reminder:toggle:<personId>:<days> | reminder:pending:<days>
+      // reminder:toggle:<personId>:<days> | reminder:pending:<days> | reminder:def
+      if (a === 'def') return { kind: 'reminder:defaults' };
       return a === 'pending'
         ? { kind: 'reminder:pending', days: b }
         : { kind: 'reminder:toggle', personId: b, days: c };
+    case 'bd':
+      // bd:m:<month> | bd:d:<day> | bd:y:<year> | bd:yp:<firstYearOfPage>
+      // | bd:ny (no year) | bd:b (one screen back)
+      if (a === 'm') return { kind: 'bd:month', month: b };
+      if (a === 'd') return { kind: 'bd:day', day: b };
+      if (a === 'y') return { kind: 'bd:year', year: b };
+      if (a === 'yp') return { kind: 'bd:page', year: b };
+      if (a === 'ny') return { kind: 'bd:noYear' };
+      return { kind: 'bd:back' };
+    case 'qp':
+      // qp:<field>:<index>
+      return isOneOf(a ?? '', QUICK_PICK_FIELDS)
+        ? { kind: `qp:${a}`, index: b }
+        : { kind: '' };
     case 'settings':
       // settings:tz:set:<Area/City> — the zone may contain slashes, never colons.
       if (a === 'tz') return { kind: 'settings:tz:set', timezone: c };
@@ -152,8 +184,19 @@ export function parseCallbackData(raw: string | undefined): CallbackData | null 
     (data.kind === 'flow:person:save') ||
     (data.kind === 'flow:person:back') ||
     (data.kind === 'flow:person:next') ||
+    (data.kind === 'flow:person:keep') ||
     (data.kind === 'reminder:toggle' && data.personId !== undefined && data.days !== undefined) ||
     (data.kind === 'reminder:pending' && data.days !== undefined) ||
+    (data.kind === 'reminder:defaults') ||
+    (data.kind === 'bd:month' && data.month !== undefined) ||
+    (data.kind === 'bd:day' && data.day !== undefined) ||
+    (data.kind === 'bd:year' && data.year !== undefined) ||
+    (data.kind === 'bd:page' && data.year !== undefined) ||
+    (data.kind === 'bd:noYear') ||
+    (data.kind === 'bd:back') ||
+    (data.kind.startsWith('qp:') &&
+      isOneOf(data.kind.slice(3), QUICK_PICK_FIELDS) &&
+      data.index !== undefined) ||
     (data.kind.startsWith(SETTINGS_PREFIX) &&
       isOneOf(data.kind.slice(SETTINGS_PREFIX.length), SETTINGS_ACTIONS) &&
       data.kind !== `${SETTINGS_PREFIX}tz:set`) ||
@@ -177,6 +220,30 @@ export const reminderToggleCallback = (personId: string, days: number): string =
   `reminder:toggle:${personId}:${days}`;
 
 export const reminderPendingCallback = (days: number): string => `reminder:pending:${days}`;
+
+/** Back to the reminder offsets the product ships as the default selection. */
+export const reminderDefaultsCallback = (): string => 'reminder:def';
+
+// --- Jalali date picker (`bd:*`) -------------------------------------------
+
+export const birthdayMonthCallback = (month: number): string => `bd:m:${month}`;
+
+export const birthdayDayCallback = (day: number): string => `bd:d:${day}`;
+
+export const birthdayYearCallback = (year: number): string => `bd:y:${year}`;
+
+/** `bd:yp:<firstYearOfPage>` — the year grid is paged, not scrolled. */
+export const birthdayPageCallback = (firstYear: number): string => `bd:yp:${firstYear}`;
+
+/** The birth year is optional: this finishes the picker without one. */
+export const birthdayNoYearCallback = (): string => 'bd:ny';
+
+/** One screen back inside the picker (year → day → month). */
+export const birthdayBackCallback = (): string => 'bd:b';
+
+/** `qp:<field>:<index>` — a one-tap answer taken from the dictionary. */
+export const quickPickCallback = (field: QuickPickField, index: number): string =>
+  `qp:${field}:${index}`;
 
 export const timezoneCallback = (timezone: string): string => `settings:tz:set:${timezone}`;
 
@@ -217,6 +284,14 @@ export const flowBackCallback = (): string => 'flow:person:back';
 
 /** `flow:person:next` — «⏭ بعدی», skips an optional answer. */
 export const flowNextCallback = (): string => 'flow:person:next';
+
+/**
+ * `flow:person:keep` — accepts the answer the buttons already collected.
+ *
+ * Distinct from «⏭ بعدی» on purpose: next stores "no answer", this stores what
+ * is on screen. One payload doing both would discard every chip the user tapped.
+ */
+export const flowKeepCallback = (): string => 'flow:person:keep';
 
 /** `settings:<section>` — the settings screen sections. */
 export const settingsCallback = (section: 'reminders' | 'timezone' | 'language'): string =>

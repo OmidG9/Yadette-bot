@@ -28,5 +28,22 @@ export const MAX_INTEREST_LENGTH = 40;
  */
 export const UNKNOWN_BIRTH_YEAR_JALALI = 1399;
 
+/**
+ * Jalali birth years the date picker offers.
+ *
+ * 1300 is 1921 CE — the oldest birth year a living person can plausibly have —
+ * and the upper bound keeps the grid inside `isValidJalaliDate`'s own range.
+ */
+export const MIN_BIRTH_YEAR_JALALI = 1300;
+export const MAX_BIRTH_YEAR_JALALI = 1500;
+
+/**
+ * Years on one page of the picker's year grid.
+ *
+ * Four columns of three rows: wide enough for `۱۳۸۰` plus an age on the second
+ * line, and still three taps from any page.
+ */
+export const BIRTH_YEAR_PAGE_SIZE = 12;
+
 export const SUPPORTED_LANGUAGES = ['fa'] as const;
 export type SupportedLanguage = (typeof SUPPORTED_LANGUAGES)[number];

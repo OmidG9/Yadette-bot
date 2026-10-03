@@ -23,6 +23,12 @@ import {
   timezoneKeyboard,
 } from '../../src/bot/keyboards/settings.js';
 import { welcomeKeyboard } from '../../src/bot/keyboards/start.js';
+import {
+  birthdayDayKeyboard,
+  birthdayMonthKeyboard,
+  birthdayYearKeyboard,
+} from '../../src/bot/keyboards/birthday.js';
+import { interestPresetKeyboard, namePresetKeyboard } from '../../src/bot/keyboards/quick-pick.js';
 import { calendarKeyboard } from '../../src/bot/views/calendar.views.js';
 import { allFlagsOn, flagsExcept } from '../helpers/feature-flags.js';
 import type { UserSettings } from '../../src/modules/settings/settings.repository.js';
@@ -135,6 +141,13 @@ const KEYBOARDS: [string, unknown][] = [
   ['flowNavKeyboard (next only)', flowNavKeyboard({ canSkip: true, canGoBack: false })],
   ['snoozeKeyboard', snoozeKeyboard('log123')],
   ['snoozeOptionsKeyboard', snoozeOptionsKeyboard('log123')],
+  ['birthdayMonthKeyboard', birthdayMonthKeyboard('fa')],
+  ['birthdayDayKeyboard', birthdayDayKeyboard(1, 'fa')],
+  ['birthdayYearKeyboard (first page)', birthdayYearKeyboard(1300, 1404, 'fa')],
+  ['birthdayYearKeyboard (later page)', birthdayYearKeyboard(1380, 1404, 'fa')],
+  ['namePresetKeyboard', namePresetKeyboard('fa')],
+  ['interestPresetKeyboard (none selected)', interestPresetKeyboard([], 'fa')],
+  ['interestPresetKeyboard (two selected)', interestPresetKeyboard(['فوتبال', 'موسیقی'], 'fa')],
   ['calendarKeyboard (current month)', calendarKeyboard(januaryMonth, today, 'fa', allFlagsOn())],
   ['calendarKeyboard (paged back)', calendarKeyboard(decemberMonth, today, 'fa', allFlagsOn())],
   ['calendarKeyboard (paged forward)', calendarKeyboard(februaryMonth, today, 'fa', allFlagsOn())],

@@ -78,6 +78,9 @@ async function main(): Promise<void> {
   // stop` would kill the bot outright instead of draining it.
   installShutdownHandlers({
     logger,
+    // No `process.exit` here: the module owns the exit so the code matches the
+    // reason — a signal is a clean 0, a crash is a 1 — and so a teardown that
+    // throws still ends the process.
     onShutdown: async (reason) => {
       logger.info({ event: 'app.shutdown', reason }, 'shutting down');
 
@@ -88,8 +91,6 @@ async function main(): Promise<void> {
       await disconnectDatabase().catch((error: unknown) => {
         logger.warn({ event: 'db.disconnect.failed', err: toError(error) }, 'db disconnect failed');
       });
-
-      process.exit(0);
     },
   });
 

@@ -48,7 +48,7 @@ describe('callback data round-trip', () => {
   });
 
   it('parses reminder toggles and pending days', () => {
-    expect(parseCallbackData('reminder:toggle:person1:7')).toEqual({
+    expect(parseCallbackData(reminderToggleCallback('person1', 7))).toEqual({
       kind: 'reminder:toggle',
       personId: 'person1',
       days: 7,

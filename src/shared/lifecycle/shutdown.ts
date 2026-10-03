@@ -9,9 +9,26 @@ export interface ShutdownHandlersOptions {
    * Performs the actual teardown. Called at most once no matter how many
    * signals arrive: a `SIGTERM` that lands while an `uncaughtException` is being
    * handled must not start a second teardown.
+   *
+   * Whatever this throws is logged, and the process still exits — a teardown that
+   * half-completes must never leave a half-stopped process serving traffic.
    */
   onShutdown: (reason: ShutdownReason) => Promise<void> | void;
   logger: Pick<Logger, 'error' | 'fatal'>;
+  /** Overridable for tests; defaults to `process.exit`. */
+  exit?: (code: number) => void;
+}
+
+/**
+ * A crash is not a clean stop.
+ *
+ * `docker stop` and a `Ctrl+C` both mean "we are done on purpose" and deserve a
+ * 0. An `uncaughtException` means the process is broken: reporting success would
+ * tell an orchestrator the container is healthy when it is not, and would let a
+ * restart policy treat a crash loop as normal completion.
+ */
+export function exitCodeFor(reason: ShutdownReason): number {
+  return reason === 'uncaughtException' ? 1 : 0;
 }
 
 /**
@@ -28,7 +45,7 @@ export interface ShutdownHandlersOptions {
  * `main.ts` therefore calls this *before* starting the bot.
  */
 export function installShutdownHandlers(options: ShutdownHandlersOptions): () => void {
-  const { onShutdown, logger } = options;
+  const { onShutdown, logger, exit = (code: number) => process.exit(code) } = options;
 
   let shuttingDown = false;
 
@@ -39,22 +56,33 @@ export function installShutdownHandlers(options: ShutdownHandlersOptions): () =>
     }
     shuttingDown = true;
 
-    // `onShutdown` decides how the process ends, so a failure inside it must not
-    // escape as an unhandled rejection. It is invoked synchronously — the first
-    // step of a teardown (stopping the scheduler) must not wait a microtask.
+    // Whatever happens below, the process ends. A teardown that throws partway
+    // through must not leave the bot polling with a closed database pool.
+    const finish = (): void => exit(exitCodeFor(reason));
+
+    // `onShutdown` is invoked synchronously — the first step of a teardown
+    // (stopping the scheduler) must not wait a microtask.
     let teardown: Promise<void> | void;
     try {
       teardown = onShutdown(reason);
     } catch (error: unknown) {
       logger.fatal({ event: 'app.shutdown.failed', reason, err: toError(error) }, 'shutdown failed');
+      finish();
       return;
     }
 
-    if (teardown) {
-      void Promise.resolve(teardown).catch((error: unknown) => {
-        logger.fatal({ event: 'app.shutdown.failed', reason, err: toError(error) }, 'shutdown failed');
-      });
+    if (!teardown) {
+      finish();
+      return;
     }
+
+    void Promise.resolve(teardown).then(
+      () => finish(),
+      (error: unknown) => {
+        logger.fatal({ event: 'app.shutdown.failed', reason, err: toError(error) }, 'shutdown failed');
+        finish();
+      },
+    );
   };
 
   const onSigint = (): void => requestShutdown('SIGINT');

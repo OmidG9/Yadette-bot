@@ -1,5 +1,6 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import {
+  exitCodeFor,
   installShutdownHandlers,
   type ShutdownReason,
 } from '../../src/shared/lifecycle/shutdown.js';
@@ -11,11 +12,16 @@ function stubLogger(): { error: ReturnType<typeof vi.fn>; fatal: ReturnType<type
 
 const disposers: (() => void)[] = [];
 
+/**
+ * Installs handlers with a stubbed exit. Without the stub the module would end
+ * the vitest worker on the first signal.
+ */
 function install(
   onShutdown: (reason: ShutdownReason) => Promise<void> | void,
   logger: { error: ReturnType<typeof vi.fn>; fatal: ReturnType<typeof vi.fn> } = stubLogger(),
+  exit: (code: number) => void = vi.fn(),
 ): { error: ReturnType<typeof vi.fn>; fatal: ReturnType<typeof vi.fn> } {
-  const dispose = installShutdownHandlers({ logger, onShutdown });
+  const dispose = installShutdownHandlers({ logger, onShutdown, exit });
   disposers.push(dispose);
   return logger;
 }
@@ -127,11 +133,100 @@ describe('installShutdownHandlers', () => {
 
   it('stops listening once disposed', () => {
     const onShutdown = vi.fn();
-    const dispose = installShutdownHandlers({ logger: stubLogger(), onShutdown });
+    const dispose = installShutdownHandlers({ logger: stubLogger(), exit: vi.fn(), onShutdown });
     dispose();
 
     signal('SIGTERM');
 
     expect(onShutdown).not.toHaveBeenCalled();
+  });
+});
+
+describe('exit code matches the reason', () => {
+  /**
+   * `exit: 0` after a crash tells a restart policy the container completed
+   * normally, so a crash loop looks like a healthy service.
+   */
+  it('exits 1 on an uncaught exception and 0 on a signal', async () => {
+    const crashes: number[] = [];
+    const stops: number[] = [];
+
+    installShutdownHandlers({
+      logger: stubLogger(),
+      exit: (code) => crashes.push(code),
+      onShutdown: () => {},
+    });
+    (process as NodeJS.EventEmitter).emit('uncaughtException', new Error('boom'));
+    await new Promise((resolve) => setImmediate(resolve));
+
+    installShutdownHandlers({
+      logger: stubLogger(),
+      exit: (code) => stops.push(code),
+      onShutdown: () => {},
+    });
+    signal('SIGTERM');
+    await new Promise((resolve) => setImmediate(resolve));
+
+    expect(crashes).toEqual([1]);
+    expect(stops).toEqual([0]);
+  });
+
+  it('exposes the mapping directly', () => {
+    expect(exitCodeFor('SIGINT')).toBe(0);
+    expect(exitCodeFor('SIGTERM')).toBe(0);
+    expect(exitCodeFor('uncaughtException')).toBe(1);
+  });
+});
+
+describe('the process always ends', () => {
+  /**
+   * A teardown that throws halfway through leaves the bot polling against a
+   * closed database pool. Staying alive is worse than exiting, so the exit is
+   * not conditional on the teardown succeeding.
+   */
+  it('exits even when the teardown throws synchronously', async () => {
+    const exit = vi.fn();
+    const logger = stubLogger();
+    installShutdownHandlers({
+      logger,
+      exit,
+      onShutdown: () => {
+        throw new Error('stopped halfway');
+      },
+    });
+
+    signal('SIGTERM');
+    await new Promise((resolve) => setImmediate(resolve));
+
+    expect(exit).toHaveBeenCalledWith(0);
+    expect(logger.fatal).toHaveBeenCalledWith(
+      expect.objectContaining({ event: 'app.shutdown.failed' }),
+      expect.any(String),
+    );
+  });
+
+  it('exits even when the teardown rejects', async () => {
+    const exit = vi.fn();
+    installShutdownHandlers({
+      logger: stubLogger(),
+      exit,
+      onShutdown: () => Promise.reject(new Error('disconnect hung')),
+    });
+
+    signal('SIGTERM');
+    await new Promise((resolve) => setImmediate(resolve));
+
+    expect(exit).toHaveBeenCalledWith(0);
+  });
+
+  it('exits after a synchronous teardown, without waiting a tick', () => {
+    const exit = vi.fn();
+    installShutdownHandlers({ logger: stubLogger(), exit, onShutdown: () => {} });
+
+    signal('SIGTERM');
+
+    // Synchronous: the scheduler must already be stopped by the time the
+    // handler returns, before any `await` gets a chance to run.
+    expect(exit).toHaveBeenCalledWith(0);
   });
 });

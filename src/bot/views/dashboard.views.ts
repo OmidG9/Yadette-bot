@@ -34,26 +34,21 @@ export function dashboardText(buckets: BirthdayBuckets, lang: Language): string 
   const monthName = JALALI_MONTH_NAMES[buckets.jalaliMonth - 1] ?? toPersianDigits(buckets.jalaliMonth);
   const parts: string[] = [t('dashboard.title', lang), ''];
 
-  const section = (heading: string, items: UpcomingBirthday[]): void => {
-    if (items.length === 0) return;
+  /**
+   * Every bucket keeps its heading, even when empty. Dropping the heading made
+   * the screen change shape as birthdays came and went, so "no birthdays this
+   * week" was indistinguishable from a section that had been forgotten.
+   */
+  const section = (heading: string, items: UpcomingBirthday[], empty: string): void => {
     parts.push(heading);
+    if (items.length === 0) parts.push(empty);
     for (const item of items) parts.push(itemLine(item, lang));
     parts.push('');
   };
 
-  section(t('dashboard.todayHeading', lang), buckets.today);
-  section(t('dashboard.weekHeading', lang), buckets.thisWeek);
-
-  if (buckets.later.length > 0) {
-    parts.push(t('dashboard.laterHeading', lang));
-    for (const item of buckets.later) parts.push(itemLine(item, lang));
-    parts.push('');
-  }
-
-  // Only nag about an empty bucket when there is nothing else to say.
-  if (buckets.today.length === 0 && buckets.thisWeek.length === 0) {
-    parts.push(`${t('dashboard.todayHeading', lang)} ${t('dashboard.emptyToday', lang)}`, '');
-  }
+  section(t('dashboard.todayHeading', lang), buckets.today, t('dashboard.emptyToday', lang));
+  section(t('dashboard.weekHeading', lang), buckets.thisWeek, t('dashboard.emptyWeek', lang));
+  section(t('dashboard.laterHeading', lang), buckets.later, t('dashboard.emptyLater', lang));
 
   if (buckets.nextBirthday) {
     parts.push(

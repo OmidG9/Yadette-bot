@@ -19,21 +19,35 @@ const person = {
 /** Mehr 18 1405, the "0 days before" slot. */
 const birthday = new Date('2026-10-10T06:00:00.000Z');
 
-function makeJob(users: { telegramId: string }[] | null): {
+interface SentMessage {
+  chatId: string;
+  text: string;
+  /**
+   * The third argument is where the snooze keyboard lives. It used to be
+   * dropped by this fake, which meant §3.5's "the buttons are on the message"
+   * had no test at all and could not have had one.
+   */
+  options?: { parse_mode?: string; reply_markup?: unknown };
+}
+
+function makeJob(
+  users: { telegramId: string }[] | null,
+  canSnooze?: boolean,
+): {
   job: BirthdayReminderJob;
   service: ReminderService;
-  sent: { chatId: string; text: string }[];
+  sent: SentMessage[];
 } {
   const reminders = new FakeReminderRepository();
   reminders.seed(person);
   const userRepo = new FakeUserRepository([fakeUser()]);
   const service = new ReminderService(reminders, userRepo);
 
-  const sent: { chatId: string; text: string }[] = [];
+  const sent: SentMessage[] = [];
   const bot = {
     api: {
-      sendMessage: async (chatId: string, text: string) => {
-        sent.push({ chatId, text });
+      sendMessage: async (chatId: string, text: string, options?: SentMessage['options']) => {
+        sent.push({ chatId, text, options });
         return { message_id: 1 };
       },
     },
@@ -43,9 +57,18 @@ function makeJob(users: { telegramId: string }[] | null): {
     reminders: service,
     users: { findById: async () => (users === null ? null : { telegramId: '42' }) },
     bot: bot as never,
+    canSnooze,
   });
 
   return { job, service, sent };
+}
+
+/** Flattens an inline keyboard to the callback payloads it carries. */
+function snoozePayloads(message: SentMessage): string[] {
+  const markup = message.options?.reply_markup as
+    | { inline_keyboard?: { callback_data?: string }[][] }
+    | undefined;
+  return (markup?.inline_keyboard ?? []).flat().map((button) => button.callback_data ?? '');
 }
 
 describe('delivering a birthday reminder', () => {
@@ -80,6 +103,48 @@ describe('delivering a birthday reminder', () => {
     await job.run();
 
     expect(sent).toHaveLength(1);
+  });
+
+  /**
+   * §3.5 — the snooze buttons have to travel with the notification. Nothing
+   * asserted this, so the feature could have shipped with the keyboard missing
+   * and every other snooze test would still have passed.
+   *
+   * The delivered message carries the entry button, which names the log row of
+   * this specific delivery; the 1/3/7 offsets arrive on the follow-up screen.
+   */
+  describe('snooze buttons on the delivered message', () => {
+    it('offers a snooze button bound to this notification', async () => {
+      const { job, sent } = makeJob([{ telegramId: '42' }], true);
+
+      await job.run();
+
+      const payloads = snoozePayloads(sent[0]!);
+      const ask = payloads.find((payload) => payload.startsWith('snz:ask:'));
+
+      expect(ask).toBeDefined();
+      // Bound to one log row, not "the last reminder": wrong the moment the
+      // user has two notifications outstanding.
+      expect(ask).toMatch(/^snz:ask:log\d+$/);
+    });
+
+    it('renders as HTML, or the bold formatting in the text shows as literal tags', async () => {
+      const { job, sent } = makeJob([{ telegramId: '42' }], true);
+
+      await job.run();
+
+      expect(sent[0]?.options?.parse_mode).toBe('HTML');
+    });
+
+    /** A disabled feature must not leave an empty button row behind. */
+    it('sends no keyboard at all when snoozing is turned off', async () => {
+      const { job, sent } = makeJob([{ telegramId: '42' }], false);
+
+      await job.run();
+
+      expect(sent).toHaveLength(1);
+      expect(sent[0]?.options?.reply_markup).toBeUndefined();
+    });
   });
 
   /**

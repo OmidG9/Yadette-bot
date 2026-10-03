@@ -27,12 +27,26 @@ function ctxFor(
   return { ctx: ctx as unknown as AppContext, sent };
 }
 
-function deps(peopleCount: number): never {
+function deps(peopleCount: number, buckets: unknown = null): never {
   return {
-    services: { persons: { countForUser: async () => peopleCount } },
+    services: {
+      persons: { countForUser: async () => peopleCount },
+      birthdays: { getDashboardForUser: async () => buckets },
+    },
     flowStore: { save: async () => undefined, clear: async () => undefined },
   } as never;
 }
+
+/** A dashboard projection with one person, for the returning-user path. */
+const withBirthdays = {
+  today: [],
+  thisWeek: [],
+  later: [],
+  nextBirthday: null,
+  totalPeople: 2,
+  thisMonthCount: 2,
+  jalaliMonth: 8,
+};
 
 describe('/start end to end', () => {
   it('gives a new user one complete message with a button per section', async () => {
@@ -63,21 +77,39 @@ describe('/start end to end', () => {
 
   it('gives a returning user a single message with the same buttons', async () => {
     const { ctx, sent } = ctxFor(fakeUser({ firstName: 'OmiD' }), false);
-    await handleStart(ctx, deps(2));
+    await handleStart(ctx, deps(2, withBirthdays));
 
     expect(sent).toHaveLength(1);
-    expect(sent[0]?.text).toContain('خوش اومدی');
+    // §3.1 calls the dashboard the main screen, so `/start` lands on it.
+    expect(sent[0]?.text).toContain('تولدهای نزدیک');
     expect(sent[0]?.text).toContain('۲ نفر');
 
     const rows = (
       sent[0]?.extra?.reply_markup as { inline_keyboard: { callback_data?: string }[][] }
     ).inline_keyboard;
+    expect(rows.flat().length).toBeGreaterThan(0);
     for (const row of rows) {
       for (const button of row) {
         if (!button.callback_data) continue;
         expect(parseCallbackData(button.callback_data), button.callback_data).not.toBeNull();
       }
     }
+  });
+
+  /** Three empty buckets is a worse first impression than the welcome text. */
+  it('still greets a returning user who has nobody registered', async () => {
+    const { ctx, sent } = ctxFor(fakeUser({ firstName: 'OmiD' }), false);
+    await handleStart(ctx, deps(0));
+
+    expect(sent[0]?.text).toContain('خوش اومدی');
+  });
+
+  it('falls back to the welcome text if the dashboard cannot be built', async () => {
+    const { ctx, sent } = ctxFor(fakeUser({ firstName: 'OmiD' }), false);
+    // `null` is what getDashboardForUser returns for a user who no longer exists.
+    await handleStart(ctx, deps(2, null));
+
+    expect(sent[0]?.text).toContain('خوش اومدی');
   });
 
   it('opens the add flow from the deep link without a greeting', async () => {
